@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Pi-hole Log Viewer{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-3"><i class="fas fa-chart-line"></i> Dashboard</h1>
+                <p class="text-muted">Visão geral do sistema Pi-hole</p>
+            </div>
+            <div class="d-flex align-items-center">
+                <span class="text-muted me-3">Última atualização: <span id="last-update">-</span></span>
+                <button class="btn btn-sm btn-outline-primary" onclick="updateAndReloadData()">
+                    <i class="fas fa-sync-alt"></i> Atualizar Dados
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-number" id="total-queries">-</div>
+            <div class="stat-label">Total de Consultas</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-number" id="blocked-queries">-</div>
+            <div class="stat-label">Consultas Bloqueadas</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-number" id="unique-clients">-</div>
+            <div class="stat-label">Clientes Únicos</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-number" id="block-rate">-</div>
+            <div class="stat-label">Taxa de Bloqueio</div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Lists -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-globe"></i> Top Domínios</h5>
+            <div id="top-domains">
+                <div class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-ban"></i> Top Domínios Bloqueados</h5>
+            <div id="top-blocked-domains">
+                <div class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top IPs and Activity Chart -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-network-wired"></i> Top IPs</h5>
+            <div id="top-ips">
+                <div class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-chart-area"></i> Atividade por Hora</h5>
+            <div class="chart-container">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5><i class="fas fa-exclamation-triangle"></i> Alertas Ativos</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="checkAlerts()">
+                    <i class="fas fa-sync-alt"></i> Verificar Alertas
+                </button>
+            </div>
+            <div id="alerts-section">
+                <div class="text-center text-muted">Carregando alertas...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-clock"></i> Atividade Recente</h5>
+            <div id="recent-activity">
+                <div class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %} 

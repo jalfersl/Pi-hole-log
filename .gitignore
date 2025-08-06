@@ -1,0 +1,55 @@
+# Arquivos de configuração com senhas
+config.py
+alert_settings.json
+
+# Bancos de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Ambiente virtual
+venv/
+venv_local/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# Arquivos de migração e teste
+migrate_to_local_db.py
+simple_migrate.py
+import_*.py
+test_*.py
+fresh_import.py
+
+# Scripts de deploy
+deploy_server.md
+install_service.sh
+setup_autostart.sh
+start_auto_update.sh
+pihole-log-viewer.service
+start.bat
+start.sh
+Makefile 

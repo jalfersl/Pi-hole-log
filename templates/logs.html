@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - Pi-hole Log Viewer{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-3"><i class="fas fa-list"></i> Logs</h1>
+        <p class="text-muted">Consulta e análise dos logs do Pi-hole</p>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-search"></i> Busca e Filtros</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="ip-search" class="form-label">Buscar por IP</label>
+                        <input type="text" id="ip-search" class="form-control" placeholder="Ex: 192.168.1.100">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="domain-search" class="form-label">Buscar por Domínio</label>
+                        <input type="text" id="domain-search" class="form-control" placeholder="Ex: google.com">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="lines-filter" class="form-label">Máximo de Linhas</label>
+                        <select id="lines-filter" class="form-select">
+                            <option value="1000">1.000</option>
+                            <option value="5000" selected>5.000</option>
+                            <option value="10000">10.000</option>
+                            <option value="50000">50.000</option>
+                            <option value="0">Todas os registros</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label for="start-date" class="form-label">Data Início</label>
+                        <input type="date" id="start-date" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label for="start-time" class="form-label">Hora Início</label>
+                        <input type="time" id="start-time" class="form-control" value="00:00">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label for="end-date" class="form-label">Data Fim</label>
+                        <input type="date" id="end-date" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="mb-3">
+                        <label for="end-time" class="form-label">Hora Fim</label>
+                        <input type="time" id="end-time" class="form-control" value="23:59">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <!-- Espaço vazio para manter alinhamento -->
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" onclick="loadLogs()">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Limpar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results -->
+<div class="row">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5><i class="fas fa-table"></i> Resultados</h5>
+                <div class="d-flex align-items-center">
+                    <span class="text-muted me-3">Total: <span id="log-count">-</span></span>
+                    <div id="loading" style="display: none;">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="no-logs" style="display: none;" class="text-center text-muted">
+                <i class="fas fa-info-circle mb-2"></i>
+                <p>Nenhum log encontrado</p>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Horário</th>
+                            <th>Domínio</th>
+                            <th>IP</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs">
+                        <!-- Logs will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="mt-4">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="pdf-title" class="form-label">Título do PDF</label>
+                        <input type="text" id="pdf-title" class="form-control" value="Relatório de Logs do Pi-hole">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="pdf-author" class="form-label">Autor do PDF</label>
+                        <input type="text" id="pdf-author" class="form-control" value="Pi-hole Log Viewer">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="pdf-subject" class="form-label">Assunto do PDF</label>
+                        <input type="text" id="pdf-subject" class="form-control" value="Relatório de Logs">
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-success" onclick="exportPDF()">
+                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/logs.js') }}"></script>
+{% endblock %} 

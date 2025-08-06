@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações - Pi-hole Log Viewer{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-3"><i class="fas fa-cog"></i> Configurações</h1>
+        <p class="text-muted">Gerencie as configurações do Pi-hole Log Viewer</p>
+    </div>
+</div>
+
+<!-- System Information -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-info-circle"></i> Informações do Sistema</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <strong>Status da Conexão:</strong> 
+                    <span id="connection-status" class="badge bg-success">Conectado</span><br>
+                    <strong>Servidor:</strong> <span id="server-host">10.2.2.10</span><br>
+                    <strong>Porta:</strong> <span id="server-port">22</span><br>
+                    <strong>Usuário:</strong> <span id="server-user">pi</span>
+                </div>
+                <div class="col-md-6">
+                    <strong>Versão do Sistema:</strong> <span>1.0.0</span><br>
+                    <strong>Última Atualização:</strong> <span id="last-update-config">-</span><br>
+                    <strong>Status do Serviço:</strong> <span class="badge bg-success">Ativo</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search Settings -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-sliders-h"></i> Configurações de Busca</h5>
+            <div class="mb-3">
+                <label for="max-results" class="form-label">Máximo de Resultados</label>
+                <select id="max-results" class="form-select">
+                    <option value="1000">1.000</option>
+                    <option value="5000" selected>5.000</option>
+                    <option value="10000">10.000</option>
+                    <option value="50000">50.000</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="cache-timeout" class="form-label">Timeout do Cache (segundos)</label>
+                <input type="number" id="cache-timeout" class="form-control" value="300" min="60" max="3600">
+            </div>
+            <div class="mb-3">
+                <label for="auto-refresh" class="form-label">Auto-refresh (segundos)</label>
+                <input type="number" id="auto-refresh" class="form-control" value="0" min="0" max="3600">
+                <small class="text-muted">0 = desabilitado</small>
+            </div>
+            <div class="mb-3">
+                <label for="update-interval" class="form-label">Intervalo de Atualização (minutos)</label>
+                <select id="update-interval" class="form-select">
+                    <option value="5">5 minutos</option>
+                    <option value="15">15 minutos</option>
+                    <option value="30" selected>30 minutos</option>
+                    <option value="60">1 hora</option>
+                    <option value="120">2 horas</option>
+                </select>
+                <small class="text-muted">Intervalo para atualização automática dos dados</small>
+            </div>
+            <div class="mb-3">
+                <label for="data-retention" class="form-label">Retenção de Dados (dias)</label>
+                <input type="number" id="data-retention" class="form-control" value="90" min="7" max="365">
+                <small class="text-muted">Por quantos dias manter os dados no banco local (padrão: 90 dias)</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-chart-bar"></i> Configurações de Dashboard</h5>
+            <div class="mb-3">
+                <label for="dashboard-update" class="form-label">Atualização do Dashboard (segundos)</label>
+                <input type="number" id="dashboard-update" class="form-control" value="30" min="10" max="300">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Settings -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-exclamation-triangle"></i> Configurações de Alertas</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="alerts-enabled" class="form-label">Alertas Habilitados</label>
+                        <select id="alerts-enabled" class="form-select">
+                            <option value="true">Sim</option>
+                            <option value="false">Não</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="ip-spike-threshold" class="form-label">Threshold IP (multiplicador)</label>
+                        <input type="number" id="ip-spike-threshold" class="form-control" value="3.0" min="1.0" max="10.0" step="0.1">
+                        <small class="text-muted">Pico de tráfego por IP</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="domain-spike-threshold" class="form-label">Threshold Domínio (multiplicador)</label>
+                        <input type="number" id="domain-spike-threshold" class="form-control" value="5.0" min="1.0" max="10.0" step="0.1">
+                        <small class="text-muted">Pico de tráfego por domínio</small>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="network-spike-threshold" class="form-label">Threshold Rede (multiplicador)</label>
+                        <input type="number" id="network-spike-threshold" class="form-control" value="2.5" min="1.0" max="10.0" step="0.1">
+                        <small class="text-muted">Pico de tráfego na rede</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="analysis-period-hours" class="form-label">Período de Análise (horas)</label>
+                        <input type="number" id="analysis-period-hours" class="form-control" value="2" min="1" max="24">
+                        <small class="text-muted">Período para análise de picos</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="telegram-enabled" class="form-label">Notificações Telegram</label>
+                        <select id="telegram-enabled" class="form-select">
+                            <option value="true">Habilitado</option>
+                            <option value="false">Desabilitado</option>
+                        </select>
+                        <small class="text-muted">Receber alertas por Telegram</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Telegram Configuration -->
+            <div id="telegram-config" class="notification-config-section">
+                <h6 class="mt-3 mb-2"><i class="fab fa-telegram"></i> Configuração Telegram</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="telegram-chat-id" class="form-label">Chat ID</label>
+                            <input type="text" id="telegram-chat-id" class="form-control" placeholder="Ex: 123456789">
+                            <small class="text-muted">ID do chat ou grupo do Telegram</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="telegram-bot-token" class="form-label">Bot Token</label>
+                            <input type="text" id="telegram-bot-token" class="form-control" placeholder="Ex: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+                            <small class="text-muted">Token do bot do Telegram</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <button type="button" class="btn btn-info btn-sm" onclick="testNotification()">
+                        <i class="fas fa-paper-plane"></i> Testar Notificação
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Settings -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-file-export"></i> Configurações de Exportação</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="pdf-title" class="form-label">Título do PDF</label>
+                        <input type="text" id="pdf-title" class="form-control" value="Relatório de Logs do Pi-hole">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="pdf-author" class="form-label">Autor do PDF</label>
+                        <input type="text" id="pdf-author" class="form-control" value="Pi-hole Log Viewer">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="pdf-subject" class="form-label">Assunto do PDF</label>
+                        <input type="text" id="pdf-subject" class="form-control" value="Relatório de DNS">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="row">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <h5><i class="fas fa-save"></i> Ações</h5>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" onclick="saveConfig()">
+                    <i class="fas fa-save"></i> Salvar Configurações
+                </button>
+                <button class="btn btn-secondary" onclick="resetConfig()">
+                    <i class="fas fa-undo"></i> Restaurar Padrões
+                </button>
+                <button class="btn btn-info" onclick="exportConfig()">
+                    <i class="fas fa-download"></i> Exportar Config
+                </button>
+                <button class="btn btn-warning" onclick="importConfig()">
+                    <i class="fas fa-upload"></i> Importar Config
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/config.js') }}"></script>
+{% endblock %} 

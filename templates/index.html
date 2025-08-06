@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pi-hole Log Viewer</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            color: #495057;
+            padding: 0;
+            width: 250px;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 1000;
+            border-right: 1px solid #dee2e6;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar .nav-link {
+            color: #6c757d;
+            padding: 15px 20px;
+            border-radius: 0;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background-color: #e9ecef;
+            color: #495057;
+            border-left-color: #007bff;
+        }
+        
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            min-height: 100vh;
+            background-color: #ffffff;
+            width: calc(100% - 250px);
+        }
+        
+        .content-wrapper {
+            padding: 20px;
+            width: 100%;
+        }
+        
+        .dashboard-section {
+            display: block;
+            width: 100%;
+        }
+        
+        .logs-section {
+            display: none;
+            width: 100%;
+        }
+        
+        .config-section {
+            display: none;
+            width: 100%;
+        }
+        
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+    }
+        
+        .status-blocked { 
+            background-color: #dc3545; 
+        }
+        
+        .status-allowed { 
+            background-color: #28a745; 
+        }
+        
+        /* Alert Styles */
+        .alert-item {
+            border-left: 4px solid #dc3545;
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .alert-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .alert-item.critical {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        
+        .alert-item.high {
+            border-left-color: #fd7e14;
+            background-color: #fff3cd;
+        }
+        
+        .alert-item.medium {
+            border-left-color: #ffc107;
+            background-color: #fff8e1;
+        }
+        
+        .alert-item.low {
+            border-left-color: #17a2b8;
+            background-color: #d1ecf1;
+        }
+        
+        .alert-severity {
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin-left: 10px;
+        }
+        
+        .alert-severity.critical {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .alert-severity.high {
+            background-color: #fd7e14;
+            color: white;
+        }
+        
+        .alert-severity.medium {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        
+        .alert-severity.low {
+            background-color: #17a2b8;
+            color: white;
+        }
+        
+        .alert-time {
+            font-size: 0.8em;
+            color: #6c757d;
+        }
+        
+        .alert-actions {
+            margin-top: 10px;
+        }
+        
+        .no-alerts {
+            text-align: center;
+            padding: 30px;
+            color: #6c757d;
+        }
+        
+        .no-alerts i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            color: #28a745;
+        }
+        
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+        
+    .log-count {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+        
+    .filter-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .log-table {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .log-table th {
+      background-color: #f8f9fa;
+            border: none;
+      padding: 15px;
+            font-weight: 600;
+        }
+        
+        .log-table td {
+            padding: 12px 15px;
+            border: none;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .log-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            color: #495057;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid #e9ecef;
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0,0,0,0.12);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .progress-bar-custom {
+            height: 8px;
+            border-radius: 4px;
+            background-color: #e9ecef;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .recent-activity {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .activity-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .domain-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .domain-count {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .export-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .export-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3);
+        }
+        
+        .export-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                min-height: auto;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+         /* Estilos para elementos do dashboard */
+         .domain-item {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             padding: 8px 0;
+             border-bottom: 1px solid #eee;
+         }
+         
+         .domain-item:last-child {
+             border-bottom: none;
+         }
+         
+         .domain-name {
+             font-family: monospace;
+             font-size: 0.9em;
+             color: #333;
+         }
+         
+         .domain-count {
+             font-weight: bold;
+             color: #28a745;
+         }
+         
+         .chart-container {
+             height: 100%;
+             min-height: 400px;
+         }
+         
+         #hourly-activity {
+             height: 350px;
+             min-height: 350px;
+         }
+         
+         #hourly-activity-chart {
+             width: 100% !important;
+             height: 100% !important;
+         }
+         
+         .domain-count.blocked {
+             color: #e74c3c;
+         }
+         
+         .hour-item {
+             display: flex;
+             align-items: center;
+             margin-bottom: 8px;
+             gap: 10px;
+         }
+         
+         .hour-label {
+             width: 50px;
+      font-size: 0.8em;
+             color: #666;
+         }
+         
+         .hour-bar {
+             flex: 1;
+             height: 20px;
+             background-color: #f0f0f0;
+             border-radius: 10px;
+             overflow: hidden;
+         }
+         
+         .hour-fill {
+             height: 100%;
+             background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
+             border-radius: 10px;
+             transition: width 0.3s ease;
+         }
+         
+         .hour-count {
+             width: 40px;
+             text-align: right;
+             font-size: 0.8em;
+             color: #666;
+         }
+         
+         .activity-item {
+             display: grid;
+             grid-template-columns: 80px 1fr 120px 100px;
+             gap: 10px;
+             padding: 8px 0;
+             border-bottom: 1px solid #eee;
+             font-size: 0.9em;
+         }
+         
+         .activity-item:last-child {
+             border-bottom: none;
+         }
+         
+         .activity-time {
+             color: #666;
+             font-size: 0.8em;
+         }
+         
+         .activity-domain {
+             font-family: monospace;
+             color: #333;
+             overflow: hidden;
+             text-overflow: ellipsis;
+             white-space: nowrap;
+         }
+         
+         .activity-ip {
+             font-family: monospace;
+             color: #666;
+             font-size: 0.8em;
+         }
+         
+         .activity-status {
+             text-align: center;
+      padding: 2px 6px;
+             border-radius: 4px;
+             font-size: 0.8em;
+             font-weight: bold;
+         }
+         
+         .activity-status.permitted {
+             background-color: #d4edda;
+             color: #155724;
+         }
+         
+         .activity-status.blocked {
+             background-color: #f8d7da;
+             color: #721c24;
+         }
+         
+         .activity-status.cached {
+             background-color: #d1ecf1;
+             color: #0c5460;
+    }
+  </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar">
+                <div class="sidebar-brand p-3">
+                    <h4><i class="fas fa-shield-alt"></i> Pi-hole</h4>
+                </div>
+                <nav class="nav flex-column">
+                    <a class="nav-link active" href="#" onclick="showDashboard()">
+                        <i class="fas fa-chart-line"></i> Dashboard
+                    </a>
+                    <a class="nav-link" href="#" onclick="showLogs()">
+                        <i class="fas fa-list"></i> Logs
+                    </a>
+                    <a class="nav-link" href="#" onclick="showConfig()">
+                        <i class="fas fa-cog"></i> Configurações
+                    </a>
+                </nav>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content">
+                <div class="content-wrapper">
+                    <!-- Dashboard Section -->
+                    <div id="dashboard-section" class="dashboard-section">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center mb-4">
+                                    <div>
+                                        <h2 class="mb-0"><i class="fas fa-shield-alt"></i> Pi-hole Log Viewer</h2>
+                                        <p class="text-muted mb-0">Visão geral das atividades do Pi-hole</p>
+                                    </div>
+                                                <div class="d-flex align-items-center justify-content-end">
+                <small class="text-muted me-3">
+                    <i class="fas fa-clock"></i> 
+                    Última atualização: <span id="last-update-time">-</span>
+                </small>
+                <button class="btn btn-primary" onclick="updateDashboardData()">
+                    <i class="fas fa-sync-alt"></i> Atualizar Dados
+                </button>
+            </div>
+                                </div>
+                            </div>
+    </div>
+
+                        <!-- Stats Cards -->
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-number" id="total-queries">-</div>
+                                    <div class="stat-label">Total de Consultas</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-number" id="blocked-queries">-</div>
+                                    <div class="stat-label">Consultas Bloqueadas</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-number" id="unique-clients">-</div>
+                                    <div class="stat-label">Clientes Únicos</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-number" id="unique-domains">-</div>
+                                    <div class="stat-label">Domínios Únicos</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Charts Row -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h5><i class="fas fa-globe"></i> Top Domínios</h5>
+                                    <div id="top-domains">
+                                        <div class="text-center text-muted">Carregando...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h5><i class="fas fa-shield-alt"></i> Top Domínios Bloqueados</h5>
+                                    <div id="top-blocked-domains">
+                                        <div class="text-center text-muted">Carregando...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Second Charts Row -->
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h5><i class="fas fa-network-wired"></i> Top IPs</h5>
+                                    <div id="top-ips">
+                                        <div class="text-center text-muted">Carregando...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <h5><i class="fas fa-clock"></i> Atividade por Hora</h5>
+                                    <div id="hourly-activity" style="height: 350px;">
+                                        <canvas id="hourly-activity-chart" style="width: 100% !important; height: 100% !important;"></canvas>
+                                        <div class="text-center text-muted">Carregando...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Alerts Section -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="chart-container">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5><i class="fas fa-exclamation-triangle"></i> Alertas Ativos</h5>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="checkAlerts()">
+                                            <i class="fas fa-sync-alt"></i> Verificar Alertas
+                                        </button>
+                                    </div>
+                                    <div id="alerts-section">
+                                        <div class="text-center text-muted">Carregando alertas...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent Activity -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="chart-container">
+                                    <h5><i class="fas fa-history"></i> Atividade Recente</h5>
+                                    <div id="recent-activity" class="recent-activity">
+                                        <div class="text-center text-muted">Carregando...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Logs Section -->
+                    <div id="logs-section" class="logs-section">
+                        <div class="row">
+                            <div class="col-12">
+                                <h2 class="mb-4"><i class="fas fa-list"></i> Visualizador de Logs</h2>
+                                <p class="text-muted">Filtre e visualize os logs de DNS do Pi-hole</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Filters -->
+    <div class="filter-section">
+      <h5><i class="fas fa-filter"></i> Filtros</h5>
+      
+                            <!-- Search Fields -->
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label for="ip-search" class="form-label">Busca por IP</label>
+          <input type="text" id="ip-search" class="form-control" placeholder="Ex: 192.168.0.2">
+          <small class="text-muted">Busca específica por endereço IP</small>
+        </div>
+                                
+        <div class="col-md-6">
+          <label for="domain-search" class="form-label">Busca por Domínio</label>
+          <input type="text" id="domain-search" class="form-control" placeholder="Ex: google.com">
+          <small class="text-muted">Busca específica por domínio</small>
+        </div>
+      </div>
+
+                            <!-- Additional Filters -->
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label for="sort-by" class="form-label">Ordenar por</label>
+          <select id="sort-by" class="form-select">
+            <option value="timestamp">Horário</option>
+            <option value="domain">Domínio</option>
+            <option value="ip">IP</option>
+            <option value="status">Status</option>
+          </select>
+        </div>
+                                
+        <div class="col-md-4">
+          <label for="sort-order" class="form-label">Ordem</label>
+          <select id="sort-order" class="form-select">
+            <option value="desc">Decrescente</option>
+            <option value="asc">Crescente</option>
+          </select>
+        </div>
+                                
+        <div class="col-md-4">
+          <label for="lines-filter" class="form-label">Linhas</label>
+          <select id="lines-filter" class="form-select">
+            <option value="100">100</option>
+            <option value="500">500</option>
+            <option value="1000" selected>1000</option>
+            <option value="5000">5000</option>
+          </select>
+        </div>
+      </div>
+
+                            <!-- Date and Time Filters -->
+                            <div class="row mb-3">
+        <div class="col-md-3">
+          <label for="start-date" class="form-label">Data Inicial</label>
+          <input type="date" id="start-date" class="form-control">
+        </div>
+                                
+        <div class="col-md-3">
+          <label for="start-time" class="form-label">Hora Inicial</label>
+          <input type="time" id="start-time" class="form-control" value="00:00">
+        </div>
+                                
+        <div class="col-md-3">
+          <label for="end-date" class="form-label">Data Final</label>
+          <input type="date" id="end-date" class="form-control">
+        </div>
+                                
+        <div class="col-md-3">
+          <label for="end-time" class="form-label">Hora Final</label>
+          <input type="time" id="end-time" class="form-control" value="23:59">
+        </div>
+      </div>
+
+                            <!-- Action Buttons -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <button id="export-pdf" class="export-btn" style="display: none;">
+                                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                                    </button>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <button class="btn btn-primary" onclick="loadLogs()">
+                                        <i class="fas fa-search"></i> Buscar
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="clearFilters()">
+                                        <i class="fas fa-times"></i> Limpar
+          </button>
+        </div>
+      </div>
+    </div>
+
+                        <!-- Results -->
+                        <div class="log-count" id="log-count" style="display: none;">
+                            <strong>Encontrados:</strong> <span id="count-number">0</span> registros
+                        </div>
+                        
+    <div id="loading" class="loading">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Carregando...</span>
+      </div>
+      <p class="mt-2">Carregando logs...</p>
+    </div>
+
+                        <div class="log-table">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Horário</th>
+                                        <th>Domínio</th>
+                                        <th>IP</th>
+                                        <th>Status</th>
+                                        <th>Tipo</th>
+          </tr>
+        </thead>
+                                <tbody id="logs">
+                                    <!-- Logs will be loaded here -->
+        </tbody>
+      </table>
+                        </div>
+    </div>
+                        
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="dashboard-card">
+                                    <h5><i class="fas fa-info-circle"></i> Informações do Sistema</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>Status da Conexão:</strong> 
+                                            <span id="connection-status" class="badge bg-success">Conectado</span><br>
+                                            <strong>Servidor:</strong> <span id="server-host">10.2.2.10</span><br>
+                                            <strong>Porta:</strong> <span id="server-port">22</span><br>
+                                            <strong>Usuário:</strong> <span id="server-user">pi</span>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Versão do Sistema:</strong> <span>1.0.0</span><br>
+                                            <strong>Última Atualização:</strong> <span id="last-update-config">-</span><br>
+                                            <strong>Status do Serviço:</strong> <span class="badge bg-success">Ativo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+
+                        
+                        <!-- System Settings -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="dashboard-card">
+                                    <h5><i class="fas fa-sliders-h"></i> Configurações de Busca</h5>
+                                    <div class="mb-3">
+                                        <label for="max-results" class="form-label">Máximo de Resultados</label>
+                                        <select id="max-results" class="form-select">
+                                            <option value="1000">1.000</option>
+                                            <option value="5000" selected>5.000</option>
+                                            <option value="10000">10.000</option>
+                                            <option value="50000">50.000</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="cache-timeout" class="form-label">Timeout do Cache (segundos)</label>
+                                        <input type="number" id="cache-timeout" class="form-control" value="300" min="60" max="3600">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="auto-refresh" class="form-label">Auto-refresh (segundos)</label>
+                                        <input type="number" id="auto-refresh" class="form-control" value="0" min="0" max="3600">
+                                        <small class="text-muted">0 = desabilitado</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="update-interval" class="form-label">Intervalo de Atualização (minutos)</label>
+                                        <select id="update-interval" class="form-select">
+                                            <option value="5">5 minutos</option>
+                                            <option value="15">15 minutos</option>
+                                            <option value="30" selected>30 minutos</option>
+                                            <option value="60">1 hora</option>
+                                            <option value="120">2 horas</option>
+                                        </select>
+                                        <small class="text-muted">Intervalo para atualização automática dos dados</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="dashboard-card">
+                                    <h5><i class="fas fa-chart-bar"></i> Configurações de Dashboard</h5>
+                                    <div class="mb-3">
+                                        <label for="dashboard-update" class="form-label">Atualização do Dashboard (segundos)</label>
+                                        <input type="number" id="dashboard-update" class="form-control" value="30" min="10" max="300">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="chart-height" class="form-label">Altura dos Gráficos (px)</label>
+                                        <input type="number" id="chart-height" class="form-control" value="300" min="200" max="600">
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="show-animations" checked>
+                                            <label class="form-check-label" for="show-animations">
+                                                Mostrar animações
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Alertas Configuration -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="dashboard-card">
+                                    <h5><i class="fas fa-exclamation-triangle"></i> Configurações de Alertas</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="alerts-enabled" class="form-label">Alertas Habilitados</label>
+                                                <select id="alerts-enabled" class="form-select">
+                                                    <option value="true">Sim</option>
+                                                    <option value="false">Não</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="ip-spike-threshold" class="form-label">Threshold IP (multiplicador)</label>
+                                                <input type="number" id="ip-spike-threshold" class="form-control" value="3.0" min="1.0" max="10.0" step="0.1">
+                                                <small class="text-muted">Pico de tráfego por IP</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="domain-spike-threshold" class="form-label">Threshold Domínio (multiplicador)</label>
+                                                <input type="number" id="domain-spike-threshold" class="form-control" value="5.0" min="1.0" max="10.0" step="0.1">
+                                                <small class="text-muted">Pico de tráfego por domínio</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="network-spike-threshold" class="form-label">Threshold Rede (multiplicador)</label>
+                                                <input type="number" id="network-spike-threshold" class="form-control" value="2.5" min="1.0" max="10.0" step="0.1">
+                                                <small class="text-muted">Pico de tráfego na rede</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="analysis-period-hours" class="form-label">Período de Análise (horas)</label>
+                                                <input type="number" id="analysis-period-hours" class="form-control" value="2" min="1" max="24">
+                                                <small class="text-muted">Período para análise de picos</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="telegram-enabled" class="form-label">Notificações Telegram</label>
+                                                <select id="telegram-enabled" class="form-select">
+                                                    <option value="true">Habilitado</option>
+                                                    <option value="false">Desabilitado</option>
+                                                </select>
+                                                <small class="text-muted">Receber alertas por Telegram</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Configuração Telegram -->
+                                    <div id="telegram-config" class="notification-config-section">
+                                        <h6 class="mt-3 mb-2"><i class="fab fa-telegram"></i> Configuração Telegram</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label for="telegram-chat-id" class="form-label">Chat ID</label>
+                                                    <input type="text" id="telegram-chat-id" class="form-control" placeholder="Ex: 123456789">
+                                                    <small class="text-muted">ID do chat ou grupo do Telegram</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label for="telegram-bot-token" class="form-label">Bot Token</label>
+                                                    <input type="text" id="telegram-bot-token" class="form-control" placeholder="Ex: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+                                                    <small class="text-muted">Token do bot do Telegram</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-3">
+                                            <button type="button" class="btn btn-info btn-sm" onclick="testNotification()">
+                                                <i class="fas fa-paper-plane"></i> Testar Notificação
+                                            </button>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                        
+                        <!-- Export Settings -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="dashboard-card">
+                                    <h5><i class="fas fa-file-export"></i> Configurações de Exportação</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label for="pdf-title" class="form-label">Título do PDF</label>
+                                            <input type="text" id="pdf-title" class="form-control" value="Relatório de Logs do Pi-hole">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="pdf-author" class="form-label">Autor do PDF</label>
+                                            <input type="text" id="pdf-author" class="form-control" value="Pi-hole Log Viewer">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="pdf-subject" class="form-label">Assunto do PDF</label>
+                                            <input type="text" id="pdf-subject" class="form-control" value="Relatório de DNS">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="dashboard-card">
+                                    <h5><i class="fas fa-save"></i> Ações</h5>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-primary" onclick="saveConfig()">
+                                            <i class="fas fa-save"></i> Salvar Configurações
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="resetConfig()">
+                                            <i class="fas fa-undo"></i> Restaurar Padrões
+                                        </button>
+                                        <button class="btn btn-info" onclick="exportConfig()">
+                                            <i class="fas fa-download"></i> Exportar Config
+                                        </button>
+                                        <button class="btn btn-warning" onclick="importConfig()">
+                                            <i class="fas fa-upload"></i> Importar Config
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+
+  <!-- Modal para detalhes -->
+  <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="detailsModalLabel">Detalhes do Domínio</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div id="modal-content">
+            <!-- Conteúdo será carregado dinamicamente -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    function showLoading() {
+            const loadingElement = document.getElementById('loading');
+            const logCountElement = document.getElementById('log-count');
+            const noLogsElement = document.getElementById('no-logs');
+            
+            if (loadingElement) loadingElement.style.display = 'block';
+            if (logCountElement) logCountElement.style.display = 'none';
+            if (noLogsElement) noLogsElement.style.display = 'none';
+    }
+
+    function hideLoading() {
+            const loadingElement = document.getElementById('loading');
+            if (loadingElement) loadingElement.style.display = 'none';
+    }
+
+    function clearFilters() {
+            const ipSearchElement = document.getElementById('ip-search');
+            const domainSearchElement = document.getElementById('domain-search');
+            const linesElement = document.getElementById('lines-filter');
+            
+            if (ipSearchElement) ipSearchElement.value = '';
+            if (domainSearchElement) domainSearchElement.value = '';
+            if (linesElement) linesElement.value = '1000';
+            
+      clearDates();
+      loadLogs();
+    }
+
+    function clearDates() {
+            const startDateElement = document.getElementById('start-date');
+            const startTimeElement = document.getElementById('start-time');
+            const endDateElement = document.getElementById('end-date');
+            const endTimeElement = document.getElementById('end-time');
+            
+            if (startDateElement) startDateElement.value = '';
+            if (startTimeElement) startTimeElement.value = '00:00';
+            if (endDateElement) endDateElement.value = '';
+            if (endTimeElement) endTimeElement.value = '23:59';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function checkStatus() {
+      fetch('/status')
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'connected') {
+                        // Atualizar informações dos arquivos na seção de logs
+                        if (data.log_file && !data.log_file.error) {
+                            const logInfo = data.log_file;
+                            const logStat = logInfo.stat.split(' ');
+                            const logSize = parseInt(logStat[4]) || 0;
+                            const logDate = logStat[5] + ' ' + logStat[6] + ' ' + logStat[7] || 'N/A';
+                            
+                            const logSizeElement = document.getElementById('log-size');
+                            const logLinesElement = document.getElementById('log-lines');
+                            const logDateElement = document.getElementById('log-date');
+                            
+                            if (logSizeElement) logSizeElement.textContent = formatBytes(logSize);
+                            if (logLinesElement) logLinesElement.textContent = logInfo.total_lines.toLocaleString();
+                            if (logDateElement) logDateElement.textContent = logDate;
+                        }
+                        
+                        if (data.database && !data.database.error) {
+                            const dbInfo = data.database;
+                            const dbStat = dbInfo.stat.split(' ');
+                            const dbSize = parseInt(dbStat[4]) || 0;
+                            
+                            const dbSizeElement = document.getElementById('db-size');
+                            const dbRecordsElement = document.getElementById('db-records');
+                            const dbPeriodElement = document.getElementById('db-period');
+                            
+                            if (dbSizeElement) dbSizeElement.textContent = formatBytes(dbSize);
+                            if (dbRecordsElement) dbRecordsElement.textContent = dbInfo.total_records.toLocaleString();
+                            if (dbPeriodElement) dbPeriodElement.textContent = `${dbInfo.oldest_date} até ${dbInfo.newest_date}`;
+                        }
+                        
+                        // Atualizar estatísticas do dashboard se estiver visível
+                        const dashboardSection = document.getElementById('dashboard-section');
+                        if (dashboardSection && dashboardSection.style.display !== 'none') {
+                            loadDashboardData();
+                        }
+          } else {
+                        console.error('Erro de conexão:', data.error);
+          }
+        })
+        .catch(err => {
+                    console.error('Erro ao verificar status:', err);
+        });
+    }
+
+    function formatTimestamp(timestamp) {
+      try {
+        // Se o timestamp já tem ano, usar diretamente
+        if (timestamp.includes('2025') || timestamp.includes('2024') || timestamp.includes('2023')) {
+          const date = new Date(timestamp);
+          if (!isNaN(date.getTime())) {
+            return date.toLocaleString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            });
+          }
+        }
+        
+        // Se não tem ano, adicionar o ano atual
+        const currentYear = new Date().getFullYear();
+        const timestampWithYear = `${timestamp} ${currentYear}`;
+        const date = new Date(timestampWithYear);
+        
+        if (isNaN(date.getTime())) {
+          return timestamp;
+        }
+        
+        return date.toLocaleString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      } catch (e) {
+        return timestamp;
+      }
+    }
+
+    function getStatusClass(type) {
+      const blockedTypes = ['blocked', 'blacklisted'];
+      return blockedTypes.some(blocked => type.toLowerCase().includes(blocked)) 
+        ? 'status-blocked' : 'status-allowed';
+    }
+
+    function getStatusText(type) {
+      const blockedTypes = ['blocked', 'blacklisted'];
+      return blockedTypes.some(blocked => type.toLowerCase().includes(blocked)) 
+        ? 'Bloqueado' : 'Permitido';
+    }
+
+    // Variável global para armazenar os logs originais
+    let originalLogs = [];
+
+    function showDetails(domain, subdomains) {
+      const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+      const modalContent = document.getElementById('modal-content');
+      const modalTitle = document.getElementById('detailsModalLabel');
+      
+      modalTitle.textContent = `Detalhes: ${domain}`;
+      
+      // Mostrar loading
+      modalContent.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Carregando detalhes...</p></div>';
+      modal.show();
+      
+      // Filtrar os logs originais pelo domínio, mantendo os filtros aplicados
+      const domainLogs = originalLogs.filter(log => {
+        // Verificar se o domínio contém o domínio base
+        return log.domain && log.domain.includes(domain);
+      });
+      
+      if (domainLogs.length === 0) {
+        modalContent.innerHTML = '<div class="alert alert-warning">Nenhum log encontrado para este domínio</div>';
+        return;
+      }
+      
+      // Criar tabela de detalhes
+      let tableHtml = `
+        <h6>Domínio: <code>${domain}</code></h6>
+        <p class="text-muted">${domainLogs.length} registros encontrados</p>
+        <div class="table-responsive">
+          <table class="table table-sm table-striped">
+            <thead>
+              <tr>
+                <th>Horário</th>
+                <th>Tipo</th>
+                <th>Domínio</th>
+                <th>IP</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      domainLogs.forEach(log => {
+        const statusClass = getStatusClass(log.type);
+        const statusText = getStatusText(log.type);
+        
+        tableHtml += `
+          <tr>
+            <td>${formatTimestamp(log.timestamp)}</td>
+            <td><span class="badge bg-secondary">${log.type}</span></td>
+            <td><code>${log.domain}</code></td>
+            <td><code>${log.ip}</code></td>
+            <td>
+              <span class="status-indicator ${statusClass}"></span>
+              ${statusText}
+            </td>
+          </tr>
+        `;
+      });
+      
+      tableHtml += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      modalContent.innerHTML = tableHtml;
+    }
+
+    function loadLogs() {
+            const loadingDiv = document.getElementById('loading');
+            const logsDiv = document.getElementById('logs');
+            const countDiv = document.getElementById('log-count');
+            const countNumber = document.getElementById('count-number');
+            
+            if (!loadingDiv || !logsDiv) {
+                console.error('Elementos necessários não encontrados');
+                return;
+            }
+            
+            loadingDiv.style.display = 'block';
+            logsDiv.innerHTML = '';
+            if (countDiv) countDiv.style.display = 'none';
+            
+            // Obter valores dos campos de busca
+            const ipSearchElement = document.getElementById("ip-search");
+            const domainSearchElement = document.getElementById("domain-search");
+            const linesElement = document.getElementById("lines-filter");
+            const startDateElement = document.getElementById("start-date");
+            const startTimeElement = document.getElementById("start-time");
+            const endDateElement = document.getElementById("end-date");
+            const endTimeElement = document.getElementById("end-time");
+            const sortByElement = document.getElementById("sort-by");
+            const sortOrderElement = document.getElementById("sort-order");
+            
+            const ipSearch = ipSearchElement ? ipSearchElement.value : '';
+            const domainSearch = domainSearchElement ? domainSearchElement.value : '';
+            const lines = linesElement ? linesElement.value : '1000';
+            const startDate = startDateElement ? startDateElement.value : '';
+            const startTime = startTimeElement ? startTimeElement.value : '';
+            const endDate = endDateElement ? endDateElement.value : '';
+            const endTime = endTimeElement ? endTimeElement.value : '';
+            const sortBy = sortByElement ? sortByElement.value : 'timestamp';
+            const sortOrder = sortOrderElement ? sortOrderElement.value : 'desc';
+            
+            // Construir query final
+            let finalQuery = '';
+            if (ipSearch && domainSearch) {
+                finalQuery = `${ipSearch} ${domainSearch}`;
+            } else if (ipSearch) {
+                finalQuery = ipSearch;
+            } else if (domainSearch) {
+                finalQuery = domainSearch;
+            }
+            
+            const params = new URLSearchParams({
+                query: finalQuery,
+                lines: lines,
+                start_date: startDate,
+                start_time: startTime,
+                end_date: endDate,
+                end_time: endTime,
+                sort_by: sortBy,
+                sort_order: sortOrder
+            });
+            
+            fetch(`/logs?${params}`)
+        .then(res => res.json())
+        .then(data => {
+                    loadingDiv.style.display = 'none';
+                    
+                    if (data.error) {
+                        logsDiv.innerHTML = `<div class="alert alert-danger">Erro: ${data.error}</div>`;
+            return;
+          }
+
+                    const logs = data.logs || [];
+                    const totalFound = data.total_found || 0;
+                    const totalReturned = data.total_returned || 0;
+                    const limited = data.limited || false;
+                    
+                    // Armazenar logs para uso no PDF
+                    window.currentLogs = logs;
+                    
+                    if (logs.length === 0) {
+                        logsDiv.innerHTML = '<div class="alert alert-info">Nenhum log encontrado com os filtros aplicados.</div>';
+            return;
+          }
+
+          // Armazenar os logs originais (não agrupados) para usar no modal
+          // Como sempre agrupamos por domínio, precisamos dos logs originais para o modal
+          fetch(`/logs?${params.toString()}`) // Buscar logs não agrupados
+            .then(res => res.json())
+            .then(originalData => {
+              if (originalData && originalData.logs) {
+                originalLogs = originalData.logs;
+              } else if (Array.isArray(originalData)) {
+                originalLogs = originalData;
+              }
+            })
+            .catch(err => {
+              console.error("Erro ao carregar logs originais:", err);
+            });
+
+          // Ocultar coluna Tipo pois sempre agrupamos por domínio
+                    const typeColumn = document.getElementById("type-column");
+                    if (typeColumn) {
+                        typeColumn.style.display = "none";
+                    }
+
+                    // Mostrar contador com informações adicionais
+                    let countText = logs.length;
+                    if (limited && totalFound > 0) {
+                        countText = `${logs.length} de ${totalFound} encontrados (limitado)`;
+                    } else if (totalFound > 0) {
+                        countText = `${logs.length} de ${totalFound} encontrados`;
+                    }
+                    if (countNumber) countNumber.textContent = countText;
+                    if (countDiv) countDiv.style.display = 'block';
+                    
+                    // Mostrar botão de exportar
+                    const exportBtn = document.getElementById('export-pdf');
+                    if (exportBtn) {
+                        if (logs.length > 0) {
+                            exportBtn.style.display = 'inline-block';
+                        } else {
+                            exportBtn.style.display = 'none';
+                        }
+                    }
+
+                    logs.forEach(log => {
+            const row = document.createElement('tr');
+            const statusClass = getStatusClass(log.type || log.status);
+            const statusText = getStatusText(log.type || log.status);
+            
+            // Verificar se é um log agrupado
+            if (log.count) {
+              // Log agrupado por domínio (sempre)
+              row.innerHTML = `
+                <td>${formatTimestamp(log.timestamp)}</td>
+                <td style="display: none;"></td>
+                <td>
+                  <code>${log.domain}</code> <span class="badge bg-info">${log.count}x</span><br>
+                  <small class="text-muted">${log.types}</small><br>
+                  <small class="text-muted">${log.subdomains}</small>
+                  ${log.subdomains.includes('...') ? `<br><button onclick="showDetails('${log.domain}', '${log.subdomains}')" class="btn btn-sm btn-outline-primary details-btn">Ver detalhes</button>` : ''}
+                </td>
+                <td><code>${log.ip}</code></td>
+                <td>
+                  <span class="status-indicator ${statusClass}"></span>
+                  ${statusText}
+                </td>
+              `;
+            } else {
+              // Log normal
+              row.innerHTML = `
+                <td>${formatTimestamp(log.timestamp)}</td>
+                <td><code>${log.domain}</code></td>
+                <td><code>${log.ip}</code></td>
+                <td>
+                  <span class="status-indicator ${statusClass}"></span>
+                  ${statusText}
+                </td>
+                <td><span class="badge bg-secondary">${log.type}</span></td>
+              `;
+            }
+                        logsDiv.appendChild(row); // Append to logsDiv
+          });
+        })
+        .catch(err => {
+                    if (loadingDiv) loadingDiv.style.display = 'none';
+                    if (logsDiv) logsDiv.innerHTML = `<div class="alert alert-danger">Erro ao carregar logs: ${err}</div>`;
+        });
+    }
+
+    // Carregar logs automaticamente ao iniciar
+    window.onload = function() {
+      checkStatus();
+            
+            // Verificar se estamos na seção de logs antes de carregar
+            const logsSection = document.getElementById('logs-section');
+            if (logsSection && logsSection.style.display !== 'none') {
+      loadLogs();
+            }
+    };
+    
+    // Permitir busca com Enter
+        const searchElement = document.getElementById('search');
+        if (searchElement) {
+            searchElement.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        loadLogs();
+      }
+            });
+        }
+
+        // Função para exportar PDF
+        function exportToPDF() {
+            // Verificar se jsPDF está disponível
+            if (typeof jsPDF === 'undefined') {
+                // Carregar jsPDF dinamicamente
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                script.onload = function() {
+                    generatePDF();
+                };
+                document.head.appendChild(script);
+            } else {
+                generatePDF();
+            }
+        }
+
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('portrait'); // Mudar para portrait (vertical)
+            
+            // Obter configurações do PDF
+            const pdfTitle = document.getElementById('pdf-title') ? document.getElementById('pdf-title').value : 'Relatório de Logs do Pi-hole';
+            const pdfAuthor = document.getElementById('pdf-author') ? document.getElementById('pdf-author').value : 'Pi-hole Log Viewer';
+            const pdfSubject = document.getElementById('pdf-subject') ? document.getElementById('pdf-subject').value : 'Relatório de DNS';
+            
+            // Configurar metadados do PDF
+            doc.setProperties({
+                title: pdfTitle,
+                author: pdfAuthor,
+                subject: pdfSubject,
+                creator: 'Pi-hole Log Viewer'
+            });
+            
+            // Título
+            doc.setFontSize(16);
+            doc.text(pdfTitle, 20, 20);
+            
+            // Informações dos filtros
+            doc.setFontSize(10);
+            const ipSearchElement = document.getElementById('ip-search');
+            const domainSearchElement = document.getElementById('domain-search');
+            const startDateElement = document.getElementById('start-date');
+            const endDateElement = document.getElementById('end-date');
+            
+            const ipSearch = ipSearchElement ? ipSearchElement.value : '';
+            const domainSearch = domainSearchElement ? domainSearchElement.value : '';
+            const startDate = startDateElement ? startDateElement.value : '';
+            const endDate = endDateElement ? endDateElement.value : '';
+            
+            let filterInfo = 'Filtros aplicados:';
+            if (ipSearch) filterInfo += ` IP: "${ipSearch}"`;
+            if (domainSearch) filterInfo += ` Domínio: "${domainSearch}"`;
+            if (startDate) filterInfo += ` Data inicial: ${startDate}`;
+            if (endDate) filterInfo += ` Data final: ${endDate}`;
+            if (!ipSearch && !domainSearch && !startDate && !endDate) filterInfo = 'Todos os registros';
+            
+            doc.text(filterInfo, 20, 30);
+            
+            // Data de geração
+            const now = new Date();
+            doc.text(`Gerado em: ${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR')}`, 20, 40);
+            
+            // Cabeçalho da tabela - apenas 4 colunas
+            doc.setFontSize(9);
+            const headers = ['Horário', 'Domínio', 'IP', 'Status'];
+            const columnWidths = [35, 75, 30, 30]; // Aumentar largura do horário
+            let xPos = 20;
+            
+            // Desenhar cabeçalho
+            headers.forEach((header, index) => {
+                doc.setFillColor(52, 73, 94);
+                doc.rect(xPos, 50, columnWidths[index], 8, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.text(header, xPos + 2, 56);
+                xPos += columnWidths[index];
+            });
+            
+            // Dados da tabela
+            doc.setTextColor(0, 0, 0);
+            const logs = window.currentLogs || [];
+            let yPos = 65;
+            let page = 1;
+            
+            logs.forEach((log, index) => {
+                // Quebra de página se necessário
+                if (yPos > 250) {
+                    doc.addPage();
+                    page++;
+                    yPos = 20;
+                    
+                    // Cabeçalho da nova página
+                    doc.setFontSize(10);
+                    doc.text(`Página ${page}`, 20, 15);
+                }
+                
+                xPos = 20;
+                
+                // Horário
+                doc.text(log.timestamp || '', xPos + 2, yPos);
+                xPos += columnWidths[0];
+                
+                // Domínio (usar splitTextToSize para quebrar linhas)
+                const domain = log.domain || '';
+                const domainLines = doc.splitTextToSize(domain, columnWidths[1] - 4);
+                doc.text(domainLines, xPos + 2, yPos);
+                xPos += columnWidths[1];
+                
+                // IP
+                doc.text(log.ip || '', xPos + 2, yPos);
+                xPos += columnWidths[2];
+                
+                // Status
+                const status = log.status || '';
+                doc.text(status, xPos + 2, yPos);
+                
+                // Ajustar posição Y baseado no número de linhas do domínio
+                const lineHeight = 6;
+                const domainLineCount = domainLines.length;
+                yPos += Math.max(lineHeight, domainLineCount * lineHeight);
+            });
+            
+            // Salvar PDF
+            doc.save(`pihole-logs-${now.getTime()}.pdf`);
+        }
+
+        // Adicionar evento ao botão de exportar
+        document.addEventListener('DOMContentLoaded', function() {
+            const exportBtn = document.getElementById('export-pdf');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', exportToPDF);
+            }
+        });
+
+        // Funções para mostrar/ocultar seções
+        function showDashboard() {
+            const dashboardSection = document.getElementById('dashboard-section');
+            const logsSection = document.getElementById('logs-section');
+            const configSection = document.getElementById('config-section');
+            
+            if (dashboardSection) dashboardSection.style.display = 'block';
+            if (logsSection) logsSection.style.display = 'none';
+            if (configSection) configSection.style.display = 'none';
+            
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            const dashboardLink = document.querySelector('.nav-link[onclick="showDashboard()"]');
+            if (dashboardLink) dashboardLink.classList.add('active');
+            
+            // Scroll para o topo
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Carregar dados do dashboard
+            loadDashboardData();
+            loadLastUpdateTime();
+        }
+        
+        function showLogs() {
+            const dashboardSection = document.getElementById('dashboard-section');
+            const logsSection = document.getElementById('logs-section');
+            const configSection = document.getElementById('config-section');
+            
+            if (dashboardSection) dashboardSection.style.display = 'none';
+            if (logsSection) logsSection.style.display = 'block';
+            if (configSection) configSection.style.display = 'none';
+            
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            const logsLink = document.querySelector('.nav-link[onclick="showLogs()"]');
+            if (logsLink) logsLink.classList.add('active');
+            
+            // Scroll para o topo
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        function showConfig() {
+            const dashboardSection = document.getElementById('dashboard-section');
+            const logsSection = document.getElementById('logs-section');
+            const configSection = document.getElementById('config-section');
+            
+            if (dashboardSection) dashboardSection.style.display = 'none';
+            if (logsSection) logsSection.style.display = 'none';
+            if (configSection) configSection.style.display = 'block';
+            
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            const configLink = document.querySelector('.nav-link[onclick="showConfig()"]');
+            if (configLink) configLink.classList.add('active');
+            
+            // Carregar última atualização
+            loadLastUpdateConfig();
+            
+            // Scroll para o topo
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // Função para atualizar dados do dashboard
+        function updateDashboardData() {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            
+            // Mostrar loading
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+            button.disabled = true;
+            
+            // Chamar endpoint de atualização
+            fetch('/update-data')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Recarregar dados do dashboard
+                        loadDashboardData();
+                        loadLastUpdateTime();
+                        showNotification('Dados atualizados com sucesso!', 'success');
+                    } else {
+                        showNotification('Erro ao atualizar dados: ' + data.error, 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao atualizar dados:', err);
+                    showNotification('Erro ao atualizar dados', 'error');
+                })
+                .finally(() => {
+                    // Restaurar botão
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                });
+        }
+
+        // Função para carregar data/hora da última atualização
+        function loadLastUpdateTime() {
+            console.log('Carregando última atualização...');
+            fetch('/last-update')
+                .then(res => res.json())
+                .then(data => {
+                    console.log('Dados recebidos:', data);
+                    const lastUpdateElement = document.getElementById('last-update-time');
+                    console.log('Elemento encontrado:', lastUpdateElement);
+                    if (lastUpdateElement && data.last_update) {
+                        lastUpdateElement.textContent = data.last_update;
+                        console.log('Última atualização definida:', data.last_update);
+                    } else {
+                        console.log('Elemento não encontrado ou dados vazios');
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar última atualização:', err);
+                });
+        }
+        
+        // Função para carregar data/hora da última atualização na seção de configurações
+        function loadLastUpdateConfig() {
+            fetch('/last-update')
+                .then(res => res.json())
+                .then(data => {
+                    const lastUpdateElement = document.getElementById('last-update-config');
+                    if (lastUpdateElement && data.last_update) {
+                        lastUpdateElement.textContent = data.last_update;
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar última atualização:', err);
+                });
+        }
+        
+        // ===== FUNÇÕES DE ALERTAS =====
+        
+        function loadAlerts() {
+            fetch('/alerts/active')
+                .then(res => res.json())
+                .then(data => {
+                    const alertsSection = document.getElementById('alerts-section');
+                    if (!alertsSection) return;
+                    
+                    if (data.success && data.alerts && data.alerts.length > 0) {
+                        let alertsHtml = '';
+                        
+                        data.alerts.forEach(alert => {
+                            const severityClass = alert.severity || 'medium';
+                            const alertType = getAlertTypeText(alert.type);
+                            const timeAgo = formatTimeAgo(alert.created_at);
+                            
+                            alertsHtml += `
+                                <div class="alert-item ${severityClass}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong>${alertType}</strong>
+                                            <span class="alert-severity ${severityClass}">${severityClass.toUpperCase()}</span>
+                                        </div>
+                                        <small class="alert-time">${timeAgo}</small>
+                                    </div>
+                                    <div class="mt-2">
+                                        <strong>${alert.target}</strong>
+                                        <br>
+                                        <small class="text-muted">${alert.message}</small>
+                                    </div>
+                                    <div class="alert-actions">
+                                        <button class="btn btn-sm btn-outline-success" onclick="resolveAlert(${alert.id})">
+                                            <i class="fas fa-check"></i> Resolver
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-info" onclick="viewAlertDetails(${alert.id})">
+                                            <i class="fas fa-info-circle"></i> Detalhes
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        alertsSection.innerHTML = alertsHtml;
+                    } else {
+                        alertsSection.innerHTML = `
+                            <div class="no-alerts">
+                                <i class="fas fa-shield-check"></i>
+                                <h6>Nenhum Alerta Ativo</h6>
+                                <p>Todos os sistemas estão funcionando normalmente!</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar alertas:', err);
+                    const alertsSection = document.getElementById('alerts-section');
+                    if (alertsSection) {
+                        alertsSection.innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Erro ao carregar alertas: ${err.message}
+                            </div>
+                        `;
+                    }
+                });
+        }
+        
+        function checkAlerts() {
+            const alertsSection = document.getElementById('alerts-section');
+            if (alertsSection) {
+                alertsSection.innerHTML = `
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">Verificando alertas...</p>
+                    </div>
+                `;
+            }
+            
+            fetch('/alerts/check')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Recarregar alertas após verificação
+                        loadAlerts();
+                        
+                        // Mostrar notificação se novos alertas foram criados
+                        if (data.alerts && data.alerts.length > 0) {
+                            showNotification(`${data.alerts.length} novo(s) alerta(s) detectado(s)!`, 'warning');
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao verificar alertas:', err);
+                    loadAlerts(); // Recarregar alertas mesmo com erro
+                });
+        }
+        
+        function resolveAlert(alertId) {
+            if (!confirm('Tem certeza que deseja marcar este alerta como resolvido?')) {
+                return;
+            }
+            
+            fetch(`/alerts/resolve/${alertId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('Alerta resolvido com sucesso!', 'success');
+                        loadAlerts(); // Recarregar lista
+                    } else {
+                        showNotification('Erro ao resolver alerta: ' + (data.error || 'Erro desconhecido'), 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao resolver alerta:', err);
+                    showNotification('Erro ao resolver alerta', 'error');
+                });
+        }
+        
+        function viewAlertDetails(alertId) {
+            // Por enquanto, apenas mostra uma mensagem
+            // Em uma versão futura, pode abrir um modal com detalhes
+            showNotification('Funcionalidade de detalhes em desenvolvimento', 'info');
+        }
+        
+        function getAlertTypeText(type) {
+            const types = {
+                'ip_spike': 'Pico de Tráfego por IP',
+                'domain_spike': 'Pico de Tráfego por Domínio',
+                'network_spike': 'Pico de Tráfego na Rede'
+            };
+            return types[type] || 'Alerta Desconhecido';
+        }
+        
+        function formatTimeAgo(timestamp) {
+            if (!timestamp) return 'Agora mesmo';
+            
+            const now = new Date();
+            const alertTime = new Date(timestamp);
+            const diffMs = now - alertTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 1) return 'Agora mesmo';
+            if (diffMins < 60) return `${diffMins} min atrás`;
+            if (diffHours < 24) return `${diffHours}h atrás`;
+            return `${diffDays} dias atrás`;
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Criar notificação simples
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remover automaticamente após 5 segundos
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        // Função para carregar dados do dashboard
+        function loadDashboardData() {
+            // Carregar alertas
+            loadAlerts();
+            // Carregar estatísticas
+            fetch('/dashboard/stats')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const totalQueriesElement = document.getElementById('total-queries');
+                        const blockedQueriesElement = document.getElementById('blocked-queries');
+                        const uniqueClientsElement = document.getElementById('unique-clients');
+                        const uniqueDomainsElement = document.getElementById('unique-domains');
+                        
+                        if (totalQueriesElement) totalQueriesElement.textContent = data.stats.total_queries || '-';
+                        if (blockedQueriesElement) blockedQueriesElement.textContent = data.stats.blocked_queries || '-';
+                        if (uniqueClientsElement) uniqueClientsElement.textContent = data.stats.unique_clients || '-';
+                        if (uniqueDomainsElement) uniqueDomainsElement.textContent = data.stats.unique_domains || '-';
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar estatísticas:', err);
+                });
+            
+            // Carregar top domínios
+            fetch('/dashboard/top-domains')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const topDomainsDiv = document.getElementById('top-domains');
+                        if (topDomainsDiv) {
+                            topDomainsDiv.innerHTML = '';
+                            
+                            data.domains.forEach(domain => {
+                                const domainItem = document.createElement('div');
+                                domainItem.className = 'domain-item';
+                                domainItem.innerHTML = `
+                                    <span class="domain-name">${domain.domain}</span>
+                                    <span class="domain-count">${domain.count}</span>
+                                `;
+                                topDomainsDiv.appendChild(domainItem);
+                            });
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar top domínios:', err);
+                });
+            
+            // Carregar top domínios bloqueados
+            fetch('/dashboard/top-blocked-domains')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const topBlockedDomainsDiv = document.getElementById('top-blocked-domains');
+                        if (topBlockedDomainsDiv) {
+                            topBlockedDomainsDiv.innerHTML = '';
+                            
+                            data.domains.forEach(domain => {
+                                const domainItem = document.createElement('div');
+                                domainItem.className = 'domain-item';
+                                domainItem.innerHTML = `
+                                    <span class="domain-name">${domain.domain}</span>
+                                    <span class="domain-count blocked">${domain.count}</span>
+                                `;
+                                topBlockedDomainsDiv.appendChild(domainItem);
+                            });
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar top domínios bloqueados:', err);
+                });
+            
+            // Carregar top IPs
+            fetch('/dashboard/top-ips')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const topIpsDiv = document.getElementById('top-ips');
+                        if (topIpsDiv) {
+                            topIpsDiv.innerHTML = '';
+                            
+                            data.ips.forEach(ip => {
+                                const ipItem = document.createElement('div');
+                                ipItem.className = 'domain-item';
+                                ipItem.innerHTML = `
+                                    <span class="domain-name">${ip.ip}</span>
+                                    <span class="domain-count">${ip.count}</span>
+                                `;
+                                topIpsDiv.appendChild(ipItem);
+                            });
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar top IPs:', err);
+                });
+            
+            // Carregar atividade por hora
+            fetch('/dashboard/hourly-activity')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.activity) {
+                        const hourlyActivityDiv = document.getElementById('hourly-activity');
+                        if (hourlyActivityDiv) {
+                            hourlyActivityDiv.innerHTML = '<canvas id="hourly-activity-chart" width="400" height="200"></canvas>';
+                            
+                            const ctx = document.getElementById('hourly-activity-chart').getContext('2d');
+                            
+                            new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: data.activity.hours.map(h => h + ':00'),
+                                    datasets: [
+                                        {
+                                            label: 'Sites Acessados',
+                                            data: data.activity.accessed,
+                                            borderColor: '#28a745',
+                                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                                            borderWidth: 2,
+                                            fill: false,
+                                            tension: 0.4
+                                        },
+                                        {
+                                            label: 'Sites Bloqueados',
+                                            data: data.activity.blocked,
+                                            borderColor: '#dc3545',
+                                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                                            borderWidth: 2,
+                                            fill: false,
+                                            tension: 0.4
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'top',
+                                            labels: {
+                                                usePointStyle: true,
+                                                padding: 20
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            grid: {
+                                                color: 'rgba(0, 0, 0, 0.1)'
+                                            }
+                                        },
+                                        x: {
+                                            grid: {
+                                                color: 'rgba(0, 0, 0, 0.1)'
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar atividade por hora:', err);
+                });
+            
+            // Carregar atividade recente
+            fetch('/dashboard/recent-activity')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.activity) {
+                        const recentActivityDiv = document.getElementById('recent-activity');
+                        if (recentActivityDiv) {
+                            recentActivityDiv.innerHTML = '';
+                            
+                            data.activity.forEach(activity => {
+                                // Formatar timestamp para exibição
+                                const timestamp = activity.timestamp || '';
+                                const timeDisplay = timestamp ? new Date(timestamp).toLocaleTimeString('pt-BR') : '';
+                                
+                                const activityItem = document.createElement('div');
+                                activityItem.className = 'activity-item';
+                                activityItem.innerHTML = `
+                                    <div class="activity-time">${timeDisplay}</div>
+                                    <div class="activity-domain">${activity.domain || ''}</div>
+                                    <div class="activity-ip">${activity.ip || ''}</div>
+                                    <div class="activity-status ${(activity.status || '').toLowerCase()}">${activity.status || 'unknown'}</div>
+                                `;
+                                recentActivityDiv.appendChild(activityItem);
+                            });
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Erro ao carregar atividade recente:', err);
+                });
+        }
+        
+        // Funções para gerenciar configurações
+        function saveConfig() {
+            const config = {
+                maxResults: document.getElementById('max-results').value,
+                cacheTimeout: document.getElementById('cache-timeout').value,
+                autoRefresh: document.getElementById('auto-refresh').value,
+                updateInterval: document.getElementById('update-interval').value,
+                dashboardUpdate: document.getElementById('dashboard-update').value,
+                chartHeight: document.getElementById('chart-height').value,
+                showAnimations: document.getElementById('show-animations').checked,
+                pdfTitle: document.getElementById('pdf-title').value,
+                pdfAuthor: document.getElementById('pdf-author').value,
+                pdfSubject: document.getElementById('pdf-subject').value,
+                // Configurações de alertas
+                alertsEnabled: document.getElementById('alerts-enabled').value,
+                ipSpikeThreshold: document.getElementById('ip-spike-threshold').value,
+                domainSpikeThreshold: document.getElementById('domain-spike-threshold').value,
+                networkSpikeThreshold: document.getElementById('network-spike-threshold').value,
+                analysisPeriodHours: document.getElementById('analysis-period-hours').value,
+                telegramEnabled: document.getElementById('telegram-enabled').value,
+                telegramChatId: document.getElementById('telegram-chat-id').value,
+                telegramBotToken: document.getElementById('telegram-bot-token').value
+            };
+            
+            localStorage.setItem('pihole-config', JSON.stringify(config));
+            
+            // Mostrar notificação de sucesso
+            showNotification('Configurações salvas com sucesso!', 'success');
+        }
+        
+        function resetConfig() {
+            if (confirm('Tem certeza que deseja restaurar as configurações padrão?')) {
+                // Restaurar valores padrão
+                document.getElementById('max-results').value = '5000';
+                document.getElementById('cache-timeout').value = '300';
+                document.getElementById('auto-refresh').value = '0';
+                document.getElementById('update-interval').value = '30';
+                document.getElementById('dashboard-update').value = '30';
+                document.getElementById('chart-height').value = '300';
+                document.getElementById('show-animations').checked = true;
+                document.getElementById('pdf-title').value = 'Relatório de Logs do Pi-hole';
+                document.getElementById('pdf-author').value = 'Pi-hole Log Viewer';
+                document.getElementById('pdf-subject').value = 'Relatório de DNS';
+                // Configurações de alertas padrão
+                document.getElementById('alerts-enabled').value = 'true';
+                document.getElementById('ip-spike-threshold').value = '3.0';
+                document.getElementById('domain-spike-threshold').value = '5.0';
+                document.getElementById('network-spike-threshold').value = '2.5';
+                document.getElementById('analysis-period-hours').value = '2';
+                document.getElementById('telegram-enabled').value = 'false';
+                document.getElementById('telegram-chat-id').value = '';
+                document.getElementById('telegram-bot-token').value = '';
+                
+                localStorage.removeItem('pihole-config');
+                showNotification('Configurações restauradas para os padrões!', 'info');
+            }
+        }
+        
+        function exportConfig() {
+            const config = {
+                maxResults: document.getElementById('max-results').value,
+                cacheTimeout: document.getElementById('cache-timeout').value,
+                autoRefresh: document.getElementById('auto-refresh').value,
+                updateInterval: document.getElementById('update-interval').value,
+                dashboardUpdate: document.getElementById('dashboard-update').value,
+                chartHeight: document.getElementById('chart-height').value,
+                showAnimations: document.getElementById('show-animations').checked,
+                pdfTitle: document.getElementById('pdf-title').value,
+                pdfAuthor: document.getElementById('pdf-author').value,
+                pdfSubject: document.getElementById('pdf-subject').value
+            };
+            
+            const dataStr = JSON.stringify(config, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'pihole-config.json';
+            link.click();
+            
+            showNotification('Configuração exportada com sucesso!', 'success');
+        }
+        
+        function importConfig() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const config = JSON.parse(e.target.result);
+                        
+                        // Aplicar configurações
+                        if (config.maxResults) document.getElementById('max-results').value = config.maxResults;
+                        if (config.cacheTimeout) document.getElementById('cache-timeout').value = config.cacheTimeout;
+                        if (config.autoRefresh) document.getElementById('auto-refresh').value = config.autoRefresh;
+                        if (config.updateInterval) document.getElementById('update-interval').value = config.updateInterval;
+                        if (config.dashboardUpdate) document.getElementById('dashboard-update').value = config.dashboardUpdate;
+                        if (config.chartHeight) document.getElementById('chart-height').value = config.chartHeight;
+                        if (config.showAnimations !== undefined) document.getElementById('show-animations').checked = config.showAnimations;
+                        if (config.pdfTitle) document.getElementById('pdf-title').value = config.pdfTitle;
+                        if (config.pdfAuthor) document.getElementById('pdf-author').value = config.pdfAuthor;
+                        if (config.pdfSubject) document.getElementById('pdf-subject').value = config.pdfSubject;
+                        
+                        showNotification('Configuração importada com sucesso!', 'success');
+                    } catch (error) {
+                        showNotification('Erro ao importar configuração: ' + error.message, 'error');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        function loadConfig() {
+            const savedConfig = localStorage.getItem('pihole-config');
+            if (savedConfig) {
+                try {
+                    const config = JSON.parse(savedConfig);
+                    
+                    // Aplicar configurações salvas
+                    if (config.maxResults) document.getElementById('max-results').value = config.maxResults;
+                    if (config.cacheTimeout) document.getElementById('cache-timeout').value = config.cacheTimeout;
+                    if (config.autoRefresh) document.getElementById('auto-refresh').value = config.autoRefresh;
+                    if (config.updateInterval) document.getElementById('update-interval').value = config.updateInterval;
+                    if (config.dashboardUpdate) document.getElementById('dashboard-update').value = config.dashboardUpdate;
+                    if (config.chartHeight) document.getElementById('chart-height').value = config.chartHeight;
+                    if (config.showAnimations !== undefined) document.getElementById('show-animations').checked = config.showAnimations;
+                    if (config.pdfTitle) document.getElementById('pdf-title').value = config.pdfTitle;
+                    if (config.pdfAuthor) document.getElementById('pdf-author').value = config.pdfAuthor;
+                    if (config.pdfSubject) document.getElementById('pdf-subject').value = config.pdfSubject;
+                    // Configurações de alertas
+                    if (config.alertsEnabled) document.getElementById('alerts-enabled').value = config.alertsEnabled;
+                    if (config.ipSpikeThreshold) document.getElementById('ip-spike-threshold').value = config.ipSpikeThreshold;
+                    if (config.domainSpikeThreshold) document.getElementById('domain-spike-threshold').value = config.domainSpikeThreshold;
+                    if (config.networkSpikeThreshold) document.getElementById('network-spike-threshold').value = config.networkSpikeThreshold;
+                    if (config.analysisPeriodHours) document.getElementById('analysis-period-hours').value = config.analysisPeriodHours;
+                    if (config.telegramEnabled) document.getElementById('telegram-enabled').value = config.telegramEnabled;
+                    if (config.telegramChatId) document.getElementById('telegram-chat-id').value = config.telegramChatId;
+                    if (config.telegramBotToken) document.getElementById('telegram-bot-token').value = config.telegramBotToken;
+                } catch (error) {
+                    console.error('Erro ao carregar configurações:', error);
+                }
+            }
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Criar notificação
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remover após 5 segundos
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+        
+        // Funções para notificações
+        function testNotification() {
+            const telegramEnabled = document.getElementById('telegram-enabled').value;
+            
+            if (telegramEnabled === 'false') {
+                showNotification('Habilite as notificações Telegram primeiro!', 'warning');
+                return;
+            }
+            
+            const chatId = document.getElementById('telegram-chat-id').value;
+            const botToken = document.getElementById('telegram-bot-token').value;
+            
+            if (!chatId || !botToken) {
+                showNotification('Configure Chat ID e Bot Token do Telegram!', 'warning');
+                return;
+            }
+            
+            // Mostrar loading
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testando...';
+            button.disabled = true;
+            
+            fetch('/notifications/test')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('✅ Notificação de teste enviada com sucesso!', 'success');
+                } else {
+                    showNotification('❌ Erro ao enviar notificação: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('❌ Erro ao testar notificação: ' + error.message, 'error');
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+        
+        // Carregar configurações ao iniciar
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfig();
+            checkStatus();
+            // Carregar última atualização quando a página carrega
+            loadLastUpdateTime();
+            
+
+    });
+  </script>
+    
+</body>
+</html>

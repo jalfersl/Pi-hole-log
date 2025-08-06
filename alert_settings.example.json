@@ -1,0 +1,14 @@
+{
+  "alerts_enabled": true,
+  "ip_spike_threshold": 3.0,
+  "domain_spike_threshold": 5.0,
+  "network_spike_threshold": 2.5,
+  "analysis_period_hours": 2,
+  "telegram_enabled": false,
+  "telegram_chat_id": "",
+  "telegram_bot_token": "",
+  "data_retention_days": 90,
+  "pdf_title": "Relatório de Logs do Pi-hole",
+  "pdf_author": "Pi-hole Log Viewer",
+  "pdf_subject": "Relatório de Logs"
+} 
