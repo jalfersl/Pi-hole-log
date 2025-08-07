@@ -48,31 +48,35 @@ function loadLogs() {
 
 // Exibir logs
 function displayLogs(logs) {
+    originalLogs = logs;
+    
     const tbody = document.getElementById('logs');
-    
-    console.log('Logs recebidos:', logs);
-    
-    if (!logs || logs.length === 0) {
-        displayNoLogs();
-        return;
-    }
-    
     let html = '';
-    logs.forEach(log => {
+    
+    logs.forEach((log, index) => {
         const statusClass = getStatusClass(log.status);
         const statusText = getStatusText(log.status);
-        
-        console.log('Processando log:', log);
+        const timestamp = formatTimestamp(log.timestamp);
         
         html += `
             <tr>
-                <td><small>${formatTimestamp(log.timestamp)}</small></td>
-                <td><code>${log.domain}</code></td>
-                <td><code>${log.ip}</code></td>
-                <td>
+                <td style="white-space: nowrap; font-size: 0.9em;">${timestamp}</td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${log.domain}</td>
+                <td style="white-space: nowrap;">
+                    <span class="badge bg-info" style="font-size: 0.8em;">
+                        <i class="fas fa-clock"></i> ${log.activity_time || 'N/A'}
+                    </span>
+                </td>
+                <td style="white-space: nowrap;">
                     <span class="status-indicator ${statusClass}"></span>
-                    ${statusText}
-                    <span class="badge bg-secondary ms-2">${log.count}</span>
+                    <span class="badge ${statusClass === 'status-blocked' ? 'bg-danger' : 'bg-success'}" style="font-size: 0.8em;">
+                        ${statusText}
+                    </span>
+                </td>
+                <td style="white-space: nowrap;">
+                    <button class="btn btn-sm btn-outline-primary" onclick="showDetails('${log.domain}', '${log.subdomains || ''}')" style="font-size: 0.8em;">
+                        <i class="fas fa-eye"></i> Detalhes
+                    </button>
                 </td>
             </tr>
         `;
@@ -142,30 +146,12 @@ async function exportPDF() {
             const response = await fetch('/api/config');
             const config = await response.json();
             if (config.success && config.settings) {
-                pdfTitle = config.settings.pdf_title || pdfTitle;
-                pdfAuthor = config.settings.pdf_author || pdfAuthor;
-                pdfSubject = config.settings.pdf_subject || pdfSubject;
+                pdfTitle = config.settings.pdfTitle || pdfTitle;
+                pdfAuthor = config.settings.pdfAuthor || pdfAuthor;
+                pdfSubject = config.settings.pdfSubject || pdfSubject;
             }
         } catch (e) {
             console.log('Usando configurações padrão para PDF');
-        }
-        
-        // Sobrescrever com valores dos campos se existirem
-        const titleField = document.getElementById('pdf-title');
-        const authorField = document.getElementById('pdf-author');
-        const subjectField = document.getElementById('pdf-subject');
-        
-        if (titleField && titleField.value) {
-            pdfTitle = titleField.value;
-            console.log('Título do PDF:', pdfTitle);
-        }
-        if (authorField && authorField.value) {
-            pdfAuthor = authorField.value;
-            console.log('Autor do PDF:', pdfAuthor);
-        }
-        if (subjectField && subjectField.value) {
-            pdfSubject = subjectField.value;
-            console.log('Assunto do PDF:', pdfSubject);
         }
         
         // Definir metadados do PDF
@@ -188,17 +174,18 @@ async function exportPDF() {
         // Cabeçalho da tabela com espaçamento melhorado
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
-        doc.text('Horário', 20, 60);
-        doc.text('Domínio', 80, 60);
-        doc.text('IP', 160, 60);
+        doc.text('Horário', 15, 60);
+        doc.text('Domínio', 50, 60);
+        doc.text('Tempo de Atividade', 130, 60);
         doc.text('Status', 190, 60);
         
         // Linha separadora
         doc.setLineWidth(0.5);
-        doc.line(20, 65, 190, 65);
+        doc.line(15, 65, 270, 65);
         
         // Dados
         doc.setFont(undefined, 'normal');
+        doc.setFontSize(9); // Fonte menor para melhor ajuste
         let y = 75;
         originalLogs.forEach((log, index) => {
             if (y > 280) {
@@ -206,9 +193,21 @@ async function exportPDF() {
                 y = 20;
             }
             
-            doc.text(formatTimestamp(log.timestamp), 20, y);
-            doc.text(log.domain, 80, y);
-            doc.text(log.ip, 160, y);
+            // Truncar domínio se muito longo (aumentar limite)
+            let domain = log.domain;
+            if (domain.length > 30) {
+                domain = domain.substring(0, 27) + '...';
+            }
+            
+            // Truncar tempo de atividade se muito longo
+            let activityTime = log.activity_time || 'N/A';
+            if (activityTime.length > 12) {
+                activityTime = activityTime.substring(0, 9) + '...';
+            }
+            
+            doc.text(formatTimestamp(log.timestamp), 15, y);
+            doc.text(domain, 50, y);
+            doc.text(activityTime, 130, y);
             doc.text(getStatusText(log.status), 190, y);
             
             y += 8;
@@ -247,11 +246,18 @@ function getStatusClass(status) {
         ? 'status-blocked' : 'status-allowed';
 }
 
-// Obter texto de status
+// Obter texto do status
 function getStatusText(status) {
-    const blockedTypes = ['blocked', 'blacklisted'];
-    return blockedTypes.some(blocked => status.toLowerCase().includes(blocked)) 
-        ? 'Bloqueado' : 'Permitido';
+    switch(status) {
+        case 'forwarded':
+            return 'Permitido';
+        case 'blocked':
+            return 'Bloqueado';
+        case 'cached':
+            return 'Cache';
+        default:
+            return status || 'N/A';
+    }
 }
 
 // Mostrar notificação
@@ -265,6 +271,77 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.remove();
     }, 3000);
+}
+
+// Mostrar detalhes de um domínio
+function showDetails(domain, subdomains) {
+    const modal = new bootstrap.Modal(document.getElementById('detailsModal'));
+    const modalContent = document.getElementById('modal-content');
+    const modalTitle = document.getElementById('detailsModalLabel');
+    
+    modalTitle.textContent = `Detalhes: ${domain}`;
+    
+    // Mostrar loading
+    modalContent.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Carregando detalhes...</p></div>';
+    modal.show();
+    
+    // Filtrar os logs originais pelo domínio
+    const domainLogs = originalLogs.filter(log => {
+        return log.domain && log.domain.includes(domain);
+    });
+    
+    if (domainLogs.length === 0) {
+        modalContent.innerHTML = '<div class="alert alert-warning">Nenhum log encontrado para este domínio</div>';
+        return;
+    }
+    
+    // Criar tabela de detalhes
+    let tableHtml = `
+        <h6>Domínio: <code>${domain}</code></h6>
+        <p class="text-muted">${domainLogs.length} registros encontrados</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Horário</th>
+                        <th>Domínio</th>
+                        <th>Tempo de Atividade</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    domainLogs.forEach(log => {
+        const statusClass = getStatusClass(log.status);
+        const statusText = getStatusText(log.status);
+        
+        tableHtml += `
+            <tr>
+                <td>${formatTimestamp(log.timestamp)}</td>
+                <td><code>${log.domain}</code></td>
+                <td>
+                    <span class="badge bg-info">
+                        <i class="fas fa-clock"></i> ${log.activity_time || 'N/A'}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-indicator ${statusClass}"></span>
+                    <span class="badge ${statusClass === 'status-blocked' ? 'bg-danger' : 'bg-success'}">
+                        ${statusText}
+                    </span>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableHtml += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    modalContent.innerHTML = tableHtml;
 }
 
 // Carregar logs ao iniciar

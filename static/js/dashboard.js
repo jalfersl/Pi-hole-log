@@ -58,8 +58,9 @@ function loadDashboardData() {
 }
 
 // Carregar estatísticas
-function loadStats() {
-    fetch('/api/stats')
+function loadStats(selectedDate = null) {
+    const url = selectedDate ? `/api/stats?date=${selectedDate}` : '/api/stats';
+    return fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -75,8 +76,9 @@ function loadStats() {
 }
 
 // Carregar gráfico de atividade
-function loadActivityChart() {
-    fetch('/api/activity-chart')
+function loadActivityChart(selectedDate = null) {
+    const url = selectedDate ? `/api/activity-chart?date=${selectedDate}` : '/api/activity-chart';
+    return fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -170,8 +172,9 @@ function createActivityChart(data) {
 }
 
 // Carregar top domínios
-function loadTopDomains() {
-    fetch('/api/top-domains')
+function loadTopDomains(selectedDate = null) {
+    const url = selectedDate ? `/api/top-domains?date=${selectedDate}` : '/api/top-domains';
+    return fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -184,8 +187,9 @@ function loadTopDomains() {
 }
 
 // Carregar top domínios bloqueados
-function loadTopBlockedDomains() {
-    fetch('/api/top-blocked-domains')
+function loadTopBlockedDomains(selectedDate = null) {
+    const url = selectedDate ? `/api/top-blocked-domains?date=${selectedDate}` : '/api/top-blocked-domains';
+    return fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -198,8 +202,9 @@ function loadTopBlockedDomains() {
 }
 
 // Carregar top IPs
-function loadTopIPs() {
-    fetch('/api/top-ips')
+function loadTopIPs(selectedDate = null) {
+    const url = selectedDate ? `/api/top-ips?date=${selectedDate}` : '/api/top-ips';
+    return fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -244,7 +249,7 @@ function displayTopList(containerId, items, labelField, countField) {
 
 // Carregar atividade recente
 function loadRecentActivity() {
-    fetch('/api/recent-activity')
+    return fetch('/api/recent-activity')
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -291,7 +296,7 @@ function displayRecentActivity(activities) {
 
 // Carregar alertas
 function loadAlerts() {
-    fetch('/api/alerts')
+    return fetch('/api/alerts')
         .then(res => res.json())
         .then(data => {
             if (data.success) {
@@ -355,8 +360,19 @@ function checkAlerts() {
 
 // Atualizar última atualização
 function updateLastUpdate() {
-    const now = new Date();
-    document.getElementById('last-update').textContent = now.toLocaleString('pt-BR');
+    return fetch('/api/last-update')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.last_update) {
+                document.getElementById('last-update-time').textContent = formatTimestamp(data.last_update);
+            } else {
+                document.getElementById('last-update-time').textContent = 'Não disponível';
+            }
+        })
+        .catch(err => {
+            console.error('Erro ao carregar última atualização:', err);
+            document.getElementById('last-update-time').textContent = 'Erro ao carregar';
+        });
 }
 
 // Formatar timestamp
@@ -391,8 +407,110 @@ function showNotification(message, type = 'info') {
 
 // Carregar dados ao iniciar
 document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar data com hoje
+    initializeDashboardDate();
+    
+    // Carregar dados
     loadDashboardData();
     
     // Atualizar a cada 30 segundos
     setInterval(loadDashboardData, 30000);
-}); 
+});
+
+// Função para mudar a data do dashboard
+function changeDashboardDate() {
+    const selectedDate = document.getElementById('dashboard-date').value;
+    
+    // Mostrar ícone de loading no seletor de data
+    const dateLoading = document.getElementById('date-loading');
+    if (dateLoading) {
+        dateLoading.style.display = 'block';
+    }
+    
+    // Mostrar loading em todos os containers
+    showLoadingState();
+    
+    // Carregar dados com a nova data
+    loadDashboardData(selectedDate).finally(() => {
+        // Esconder ícone de loading quando terminar
+        if (dateLoading) {
+            dateLoading.style.display = 'none';
+        }
+    });
+}
+
+// Função para mostrar estado de loading
+function showLoadingState() {
+    const containers = ['top-domains', 'top-blocked-domains', 'top-ips', 'recent-activity'];
+    
+    containers.forEach(containerId => {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = `
+                <div class="text-center text-muted">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <div class="mt-2">Carregando dados...</div>
+                </div>
+            `;
+        }
+    });
+    
+    // Limpar estatísticas
+    document.getElementById('total-queries').textContent = '-';
+    document.getElementById('blocked-queries').textContent = '-';
+    document.getElementById('unique-clients').textContent = '-';
+    document.getElementById('block-rate').textContent = '-';
+}
+
+// Função para inicializar a data do dashboard
+function initializeDashboardDate() {
+    const dateInput = document.getElementById('dashboard-date');
+    if (dateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+    }
+}
+
+// Função para carregar dados do dashboard com data específica
+function loadDashboardData(selectedDate = null) {
+    const promises = [];
+    
+    // Carregar estatísticas
+    promises.push(loadStats(selectedDate));
+    
+    // Carregar gráfico de atividade
+    promises.push(loadActivityChart(selectedDate));
+    
+    // Carregar top lists
+    promises.push(loadTopDomains(selectedDate));
+    promises.push(loadTopBlockedDomains(selectedDate));
+    promises.push(loadTopIPs(selectedDate));
+    
+    // Carregar atividade recente
+    promises.push(loadRecentActivity());
+    
+    // Carregar alertas
+    promises.push(loadAlerts());
+    
+    // Atualizar última atualização
+    promises.push(updateLastUpdate());
+    
+    return Promise.all(promises);
+}
+
+// Função para mostrar o dashboard
+function showDashboard() {
+    document.querySelector('.dashboard-section').style.display = 'block';
+    document.querySelector('.logs-section').style.display = 'none';
+    document.querySelector('.config-section').style.display = 'none';
+    
+    // Atualizar navegação
+    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+    document.querySelector('.nav-link[onclick="showDashboard()"]').classList.add('active');
+    
+    // Inicializar data e carregar dados
+    initializeDashboardDate();
+    loadDashboardData();
+} 

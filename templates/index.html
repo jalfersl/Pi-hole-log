@@ -503,17 +503,26 @@
                                         <h2 class="mb-0"><i class="fas fa-shield-alt"></i> Pi-hole Log Viewer</h2>
                                         <p class="text-muted mb-0">Visão geral das atividades do Pi-hole</p>
                                     </div>
-                                                <div class="d-flex align-items-center justify-content-end">
-                <small class="text-muted me-3">
-                    <i class="fas fa-clock"></i> 
-                    Última atualização: <span id="last-update-time">-</span>
-                </small>
-                <button class="btn btn-primary" onclick="updateDashboardData()">
-                    <i class="fas fa-sync-alt"></i> Atualizar Dados
-                </button>
-            </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <small class="text-muted">
+                                            <i class="fas fa-sync-alt"></i> 
+                                            Última sincronização Pi-hole: <span id="last-update-time">-</span>
+                                        </small>
+                                        <!-- Seletor de Data -->
+                                        <div class="d-flex align-items-center">
+                                            <label for="dashboard-date" class="form-label me-2 mb-0">
+                                                <i class="fas fa-calendar"></i> Data:
+                                            </label>
+                                            <input type="date" id="dashboard-date" class="form-control form-control-sm" 
+                                                   style="width: 150px;" onchange="changeDashboardDate()">
+                                        </div>
+                                        <button class="btn btn-primary" onclick="updateDashboardData()">
+                                            <i class="fas fa-sync-alt"></i> Atualizar Dados
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
     </div>
 
                         <!-- Stats Cards -->
@@ -1544,6 +1553,9 @@
             const dashboardLink = document.querySelector('.nav-link[onclick="showDashboard()"]');
             if (dashboardLink) dashboardLink.classList.add('active');
             
+            // Inicializar data da dashboard
+            initializeDashboardDate();
+            
             // Scroll para o topo
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
@@ -1835,11 +1847,23 @@
         }
         
         // Função para carregar dados do dashboard
-        function loadDashboardData() {
+        function loadDashboardData(selectedDate = null) {
+            // Se não foi passada data, usar a data selecionada no input
+            if (!selectedDate) {
+                const dateInput = document.getElementById('dashboard-date');
+                selectedDate = dateInput ? dateInput.value : null;
+            }
+            
+            console.log('Carregando dashboard para data:', selectedDate);
+            
+            // Parâmetros para as APIs
+            const params = selectedDate ? `?date=${selectedDate}` : '';
+            
             // Carregar alertas
             loadAlerts();
+            
             // Carregar estatísticas
-            fetch('/dashboard/stats')
+            fetch(`/api/stats${params}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -1859,7 +1883,7 @@
                 });
             
             // Carregar top domínios
-            fetch('/dashboard/top-domains')
+            fetch(`/api/top-domains${params}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -1884,7 +1908,7 @@
                 });
             
             // Carregar top domínios bloqueados
-            fetch('/dashboard/top-blocked-domains')
+            fetch(`/api/top-blocked-domains${params}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -1909,7 +1933,7 @@
                 });
             
             // Carregar top IPs
-            fetch('/dashboard/top-ips')
+            fetch(`/api/top-ips${params}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -1933,11 +1957,11 @@
                     console.error('Erro ao carregar top IPs:', err);
                 });
             
-            // Carregar atividade por hora
-            fetch('/dashboard/hourly-activity')
+            // Carregar gráfico de atividade por hora
+            fetch(`/api/activity-chart${params}`)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.success && data.activity) {
+                    if (data.success && data.data) {
                         const hourlyActivityDiv = document.getElementById('hourly-activity');
                         if (hourlyActivityDiv) {
                             hourlyActivityDiv.innerHTML = '<canvas id="hourly-activity-chart" width="400" height="200"></canvas>';
@@ -1947,11 +1971,11 @@
                             new Chart(ctx, {
                                 type: 'line',
                                 data: {
-                                    labels: data.activity.hours.map(h => h + ':00'),
+                                    labels: data.data.labels,
                                     datasets: [
                                         {
-                                            label: 'Sites Acessados',
-                                            data: data.activity.accessed,
+                                            label: 'Consultas',
+                                            data: data.data.queries,
                                             borderColor: '#28a745',
                                             backgroundColor: 'rgba(40, 167, 69, 0.1)',
                                             borderWidth: 2,
@@ -1959,8 +1983,8 @@
                                             tension: 0.4
                                         },
                                         {
-                                            label: 'Sites Bloqueados',
-                                            data: data.activity.blocked,
+                                            label: 'Bloqueadas',
+                                            data: data.data.blocked,
                                             borderColor: '#dc3545',
                                             backgroundColor: 'rgba(220, 53, 69, 0.1)',
                                             borderWidth: 2,
@@ -2000,38 +2024,7 @@
                     }
                 })
                 .catch(err => {
-                    console.error('Erro ao carregar atividade por hora:', err);
-                });
-            
-            // Carregar atividade recente
-            fetch('/dashboard/recent-activity')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success && data.activity) {
-                        const recentActivityDiv = document.getElementById('recent-activity');
-                        if (recentActivityDiv) {
-                            recentActivityDiv.innerHTML = '';
-                            
-                            data.activity.forEach(activity => {
-                                // Formatar timestamp para exibição
-                                const timestamp = activity.timestamp || '';
-                                const timeDisplay = timestamp ? new Date(timestamp).toLocaleTimeString('pt-BR') : '';
-                                
-                                const activityItem = document.createElement('div');
-                                activityItem.className = 'activity-item';
-                                activityItem.innerHTML = `
-                                    <div class="activity-time">${timeDisplay}</div>
-                                    <div class="activity-domain">${activity.domain || ''}</div>
-                                    <div class="activity-ip">${activity.ip || ''}</div>
-                                    <div class="activity-status ${(activity.status || '').toLowerCase()}">${activity.status || 'unknown'}</div>
-                                `;
-                                recentActivityDiv.appendChild(activityItem);
-                            });
-                        }
-                    }
-                })
-                .catch(err => {
-                    console.error('Erro ao carregar atividade recente:', err);
+                    console.error('Erro ao carregar gráfico de atividade:', err);
                 });
         }
         
@@ -2257,6 +2250,26 @@
             
 
     });
+
+        // Função para mudar a data da dashboard
+        function changeDashboardDate() {
+            const selectedDate = document.getElementById('dashboard-date').value;
+            if (selectedDate) {
+                console.log('Mudando data da dashboard para:', selectedDate);
+                loadDashboardData(selectedDate);
+            }
+        }
+        
+        // Função para inicializar a data da dashboard
+        function initializeDashboardDate() {
+            const dateInput = document.getElementById('dashboard-date');
+            if (dateInput) {
+                // Definir data atual como padrão
+                const today = new Date().toISOString().split('T')[0];
+                dateInput.value = today;
+                console.log('Data da dashboard inicializada:', today);
+            }
+        }
   </script>
     
 </body>

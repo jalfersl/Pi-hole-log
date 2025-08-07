@@ -182,14 +182,16 @@ def api_logs():
         conn = sqlite3.connect('pihole_logs.db')
         cursor = conn.cursor()
         
-        # Construir query base com agrupamento por domínio, IP e status apenas
+        # Construir query para calcular tempo de atividade
         sql = """
             SELECT 
                 domain,
                 client,
                 status,
                 COUNT(*) as count,
-                MAX(timestamp) as last_seen
+                MIN(timestamp) as first_seen,
+                MAX(timestamp) as last_seen,
+                ROUND((julianday(MAX(timestamp)) - julianday(MIN(timestamp))) * 24 * 60) as duration_minutes
             FROM queries 
             WHERE 1=1
         """
@@ -214,7 +216,7 @@ def api_logs():
             sql += " AND timestamp <= ?"
             params.append(end_datetime)
         
-        # Agrupar apenas por domínio, IP e status (sem considerar timestamp)
+        # Agrupar por domínio, IP e status
         sql += " GROUP BY domain, client, status"
         
         # Ordenar por contagem decrescente
@@ -229,12 +231,30 @@ def api_logs():
         # Converter para formato esperado
         logs = []
         for row in rows:
+            # Calcular tempo de atividade formatado
+            duration_minutes = row[6] if row[6] else 0
+            
+            if duration_minutes == 0:
+                activity_time = "Momentâneo"
+            elif duration_minutes < 60:
+                activity_time = f"{duration_minutes} min"
+            elif duration_minutes < 1440:  # menos de 24 horas
+                hours = duration_minutes // 60
+                minutes = duration_minutes % 60
+                activity_time = f"{hours}h {minutes}min"
+            else:
+                days = duration_minutes // 1440
+                hours = (duration_minutes % 1440) // 60
+                activity_time = f"{days}d {hours}h"
+            
             log = {
                 'domain': row[0],
                 'ip': row[1],
                 'status': row[2],
                 'count': row[3],
-                'timestamp': row[4]  # último acesso
+                'timestamp': row[5],  # último acesso
+                'activity_time': activity_time,
+                'duration_minutes': duration_minutes
             }
             logs.append(log)
         
@@ -255,20 +275,35 @@ def api_logs():
 def api_stats():
     """API para estatísticas do dashboard"""
     try:
+        # Obter data da requisição
+        selected_date = request.args.get('date')
+        
         conn = sqlite3.connect('pihole_logs.db')
         cursor = conn.cursor()
         
+        # Construir filtro de data
+        date_filter = ""
+        if selected_date:
+            date_filter = f"WHERE date(timestamp) = '{selected_date}'"
+        else:
+            # Se não foi especificada data, usar apenas o dia atual
+            date_filter = "WHERE date(timestamp) = date('now')"
+        
         # Total de consultas
-        cursor.execute("SELECT COUNT(*) FROM queries")
+        cursor.execute(f"SELECT COUNT(*) FROM queries {date_filter}")
         total_queries = cursor.fetchone()[0]
         
         # Consultas bloqueadas
-        cursor.execute("SELECT COUNT(*) FROM queries WHERE status = 'blocked'")
+        cursor.execute(f"SELECT COUNT(*) FROM queries {date_filter} AND status = 'blocked'")
         blocked_queries = cursor.fetchone()[0]
         
         # Clientes únicos
-        cursor.execute("SELECT COUNT(DISTINCT client) FROM queries")
+        cursor.execute(f"SELECT COUNT(DISTINCT client) FROM queries {date_filter}")
         unique_clients = cursor.fetchone()[0]
+        
+        # Domínios únicos
+        cursor.execute(f"SELECT COUNT(DISTINCT domain) FROM queries {date_filter}")
+        unique_domains = cursor.fetchone()[0]
         
         # Taxa de bloqueio
         block_rate = (blocked_queries / total_queries * 100) if total_queries > 0 else 0
@@ -281,6 +316,7 @@ def api_stats():
                 'total_queries': total_queries,
                 'blocked_queries': blocked_queries,
                 'unique_clients': unique_clients,
+                'unique_domains': unique_domains,
                 'block_rate': round(block_rate, 1)
             }
         })
@@ -291,17 +327,27 @@ def api_stats():
 def api_activity_chart():
     """API para gráfico de atividade"""
     try:
+        # Obter data da requisição
+        selected_date = request.args.get('date')
+        
         conn = sqlite3.connect('pihole_logs.db')
         cursor = conn.cursor()
         
-        # Dados apenas do dia atual por hora
-        cursor.execute("""
+        # Construir filtro de data
+        if selected_date:
+            date_filter = f"WHERE date(timestamp) = '{selected_date}'"
+        else:
+            # Se não foi especificada data, usar apenas o dia atual
+            date_filter = "WHERE date(timestamp) = date('now')"
+        
+        # Dados por hora para a data selecionada
+        cursor.execute(f"""
             SELECT 
                 strftime('%H', timestamp) as hour,
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) as blocked
             FROM queries 
-            WHERE date(timestamp) = date('now')
+            {date_filter}
             GROUP BY strftime('%H', timestamp)
             ORDER BY hour
         """)
@@ -329,13 +375,23 @@ def api_activity_chart():
 def api_top_domains():
     """API para top domínios"""
     try:
+        # Obter data da requisição
+        selected_date = request.args.get('date')
+        
         conn = sqlite3.connect('pihole_logs.db')
         cursor = conn.cursor()
         
-        cursor.execute("""
+        # Construir filtro de data
+        if selected_date:
+            date_filter = f"WHERE date(timestamp) = '{selected_date}'"
+        else:
+            # Se não foi especificada data, usar apenas o dia atual
+            date_filter = "WHERE date(timestamp) = date('now')"
+        
+        cursor.execute(f"""
             SELECT domain, COUNT(*) as count
             FROM queries 
-            WHERE timestamp >= datetime('now', '-24 hours')
+            {date_filter}
             GROUP BY domain
             ORDER BY count DESC
             LIMIT 10
@@ -352,13 +408,23 @@ def api_top_domains():
 def api_top_blocked_domains():
     """API para top domínios bloqueados"""
     try:
+        # Obter data da requisição
+        selected_date = request.args.get('date')
+        
         conn = sqlite3.connect('pihole_logs.db')
         cursor = conn.cursor()
         
-        cursor.execute("""
+        # Construir filtro de data
+        if selected_date:
+            date_filter = f"WHERE date(timestamp) = '{selected_date}'"
+        else:
+            # Se não foi especificada data, usar apenas o dia atual
+            date_filter = "WHERE date(timestamp) = date('now')"
+        
+        cursor.execute(f"""
             SELECT domain, COUNT(*) as count
             FROM queries 
-            WHERE timestamp >= datetime('now', '-24 hours')
+            {date_filter}
             AND status = 'blocked'
             GROUP BY domain
             ORDER BY count DESC
@@ -376,13 +442,23 @@ def api_top_blocked_domains():
 def api_top_ips():
     """API para top IPs"""
     try:
+        # Obter data da requisição
+        selected_date = request.args.get('date')
+        
         conn = sqlite3.connect('pihole_logs.db')
         cursor = conn.cursor()
         
-        cursor.execute("""
+        # Construir filtro de data
+        if selected_date:
+            date_filter = f"WHERE date(timestamp) = '{selected_date}'"
+        else:
+            # Se não foi especificada data, usar apenas o dia atual
+            date_filter = "WHERE date(timestamp) = date('now')"
+        
+        cursor.execute(f"""
             SELECT client, COUNT(*) as count
             FROM queries 
-            WHERE timestamp >= datetime('now', '-24 hours')
+            {date_filter}
             AND client != '127.0.0.1'
             GROUP BY client
             ORDER BY count DESC
@@ -476,6 +552,48 @@ def api_test_notification():
             return jsonify({'success': True, 'message': 'Notificação enviada com sucesso!'})
         else:
             return jsonify({'success': False, 'error': 'Bot foi bloqueado pelo usuário. Desbloqueie o bot no Telegram e tente novamente.'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/last-update')
+def api_last_update():
+    """API para obter a última atualização do Pi-hole"""
+    try:
+        # Verificar se existe arquivo de log de atualização
+        log_file = 'auto_update.log'
+        last_update = "Nunca"
+        
+        if os.path.exists(log_file):
+            # Ler as últimas linhas do arquivo de log
+            with open(log_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                
+            # Procurar pela última linha de sucesso
+            for line in reversed(lines):
+                if '✅ Dados atualizados com sucesso!' in line:
+                    # Extrair timestamp da linha
+                    try:
+                        timestamp_str = line.split(' - ')[0]
+                        timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S,%f')
+                        last_update = timestamp.strftime('%d/%m/%Y, %H:%M:%S')
+                    except:
+                        # Se não conseguir parsear, usar a linha completa
+                        last_update = line.strip()
+                    break
+                elif '🔄 Iniciando atualização automática' in line:
+                    # Se encontrou início de atualização mas não sucesso, usar essa linha
+                    try:
+                        timestamp_str = line.split(' - ')[0]
+                        timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S,%f')
+                        last_update = timestamp.strftime('%d/%m/%Y, %H:%M:%S') + ' (em andamento)'
+                    except:
+                        last_update = line.strip()
+                    break
+        
+        return jsonify({
+            'success': True,
+            'last_update': last_update
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
