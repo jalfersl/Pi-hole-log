@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Script de Atualização Automática do Pi-hole Log Viewer
-Atualiza os dados a cada 30 minutos automaticamente
 """
 
 import time

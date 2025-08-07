@@ -294,7 +294,11 @@ def api_stats():
         total_queries = cursor.fetchone()[0]
         
         # Consultas bloqueadas
-        cursor.execute(f"SELECT COUNT(*) FROM queries {date_filter} AND status = 'blocked'")
+        if selected_date:
+            blocked_filter = f"WHERE date(timestamp) = '{selected_date}' AND status = 'blocked'"
+        else:
+            blocked_filter = "WHERE date(timestamp) = date('now') AND status = 'blocked'"
+        cursor.execute(f"SELECT COUNT(*) FROM queries {blocked_filter}")
         blocked_queries = cursor.fetchone()[0]
         
         # Clientes únicos
@@ -416,16 +420,15 @@ def api_top_blocked_domains():
         
         # Construir filtro de data
         if selected_date:
-            date_filter = f"WHERE date(timestamp) = '{selected_date}'"
+            date_filter = f"WHERE date(timestamp) = '{selected_date}' AND status = 'blocked'"
         else:
             # Se não foi especificada data, usar apenas o dia atual
-            date_filter = "WHERE date(timestamp) = date('now')"
+            date_filter = "WHERE date(timestamp) = date('now') AND status = 'blocked'"
         
         cursor.execute(f"""
             SELECT domain, COUNT(*) as count
             FROM queries 
             {date_filter}
-            AND status = 'blocked'
             GROUP BY domain
             ORDER BY count DESC
             LIMIT 10
@@ -450,16 +453,15 @@ def api_top_ips():
         
         # Construir filtro de data
         if selected_date:
-            date_filter = f"WHERE date(timestamp) = '{selected_date}'"
+            date_filter = f"WHERE date(timestamp) = '{selected_date}' AND client != '127.0.0.1'"
         else:
             # Se não foi especificada data, usar apenas o dia atual
-            date_filter = "WHERE date(timestamp) = date('now')"
+            date_filter = "WHERE date(timestamp) = date('now') AND client != '127.0.0.1'"
         
         cursor.execute(f"""
             SELECT client, COUNT(*) as count
             FROM queries 
             {date_filter}
-            AND client != '127.0.0.1'
             GROUP BY client
             ORDER BY count DESC
             LIMIT 10

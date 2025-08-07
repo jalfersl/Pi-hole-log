@@ -62,6 +62,11 @@ function displayLogs(logs) {
             <tr>
                 <td style="white-space: nowrap; font-size: 0.9em;">${timestamp}</td>
                 <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${log.domain}</td>
+                <td style="white-space: nowrap; font-size: 0.9em;">
+                    <span class="badge bg-secondary" style="font-size: 0.8em;">
+                        <i class="fas fa-network-wired"></i> ${log.ip || 'N/A'}
+                    </span>
+                </td>
                 <td style="white-space: nowrap;">
                     <span class="badge bg-info" style="font-size: 0.8em;">
                         <i class="fas fa-clock"></i> ${log.activity_time || 'N/A'}
@@ -176,8 +181,8 @@ async function exportPDF() {
         doc.setFont(undefined, 'bold');
         doc.text('Horário', 15, 60);
         doc.text('Domínio', 50, 60);
-        doc.text('Tempo de Atividade', 130, 60);
-        doc.text('Status', 190, 60);
+        doc.text('IP', 120, 60);
+        doc.text('Tempo de Atividade', 170, 60);
         
         // Linha separadora
         doc.setLineWidth(0.5);
@@ -193,22 +198,28 @@ async function exportPDF() {
                 y = 20;
             }
             
-            // Truncar domínio se muito longo (aumentar limite)
+            // Truncar domínio se muito longo
             let domain = log.domain;
-            if (domain.length > 30) {
-                domain = domain.substring(0, 27) + '...';
+            if (domain.length > 25) {
+                domain = domain.substring(0, 22) + '...';
+            }
+            
+            // Truncar IP se muito longo
+            let ip = log.ip || 'N/A';
+            if (ip.length > 15) {
+                ip = ip.substring(0, 12) + '...';
             }
             
             // Truncar tempo de atividade se muito longo
             let activityTime = log.activity_time || 'N/A';
-            if (activityTime.length > 12) {
-                activityTime = activityTime.substring(0, 9) + '...';
+            if (activityTime.length > 15) {
+                activityTime = activityTime.substring(0, 12) + '...';
             }
             
             doc.text(formatTimestamp(log.timestamp), 15, y);
             doc.text(domain, 50, y);
-            doc.text(activityTime, 130, y);
-            doc.text(getStatusText(log.status), 190, y);
+            doc.text(ip, 120, y);
+            doc.text(activityTime, 170, y);
             
             y += 8;
         });
